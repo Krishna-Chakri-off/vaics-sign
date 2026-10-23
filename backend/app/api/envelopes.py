@@ -426,8 +426,8 @@ def legal_hold(env_id: int, body: HoldIn, request: Request, p: Principal = Depen
 
 # ---------- completed outputs ----------
 def _completed(env):
-    if env.status != "completed" or not env.completed_key: raise HTTPException(409, "Envelope is not completed")
     if env.purged_at: raise HTTPException(410, "Documents were purged under the retention policy")
+    if env.status != "completed" or not env.completed_key: raise HTTPException(409, "Envelope is not completed")
 
 
 @router.get("/{env_id}/completed")

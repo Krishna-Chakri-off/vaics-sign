@@ -26,7 +26,7 @@ def dsr(body: DSRIn, request: Request, p: Principal = Depends(perm("privacy.mana
     q = db.query(Recipient).join(Envelope, Envelope.id == Recipient.envelope_id).filter(Envelope.org_id == p.org.id, Recipient.email == email)
     if body.kind == "access":
         out = {"email": email, "recipients": [{"envelope": db.get(Envelope, r.envelope_id).public_id, "name": r.name, "phone": r.phone, "status": r.status,
-                                                "completed_at": r.completed_at, "ip": r.ip} for r in q],
+                                                "completed_at": r.completed_at, "ip": r.completed_ip} for r in q],
                "contacts": [{"name": c.name, "email": c.email} for c in db.query(Contact).filter_by(org_id=p.org.id, email=email)]}
     elif body.kind == "correct":
         n = 0
