@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+/* VAICS CMS look (matches the original VAICS Change Management System) */
+@theme {
+  --color-light-blue: #f2f8ff;
+  --color-rail-active: #d6e8ff;
+  --color-deep: #0d47a1;
+  --color-primary: #00b6f0;
+  --color-magenta: #e6007e;
+  --color-accent: #e6007e;
+  --text-xs: 12px;
+  --text-sm: 12px;
+  --text-base: 14px;
+  --text-lg: 18px;
+  --text-xl: 18px;
+  --text-2xl: 18px;
+}
+
+:root { color: #0f172a; font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; --change-focus-glow: 0 0 0 3px rgb(13 71 161 / 14%); }
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body { margin: 0; background: #fff; color: #0f172a; font-size: 12px; -webkit-font-smoothing: antialiased; }
+h1 { font-size: 18px; font-weight: 600; }
+h2, h3 { font-size: 14px; font-weight: 600; }
+input, select, textarea { border-color: #cbd5e1; font-size: 12px; }
+input:focus, select:focus, textarea:focus, button:focus-visible { border-color: #0d47a1 !important; box-shadow: var(--change-focus-glow) !important; outline: none !important; }
+/* corporate box UI: square corners except brand mark / badges */
+:where([class*='rounded']):not(.round) { border-radius: 0 !important; }
+.round { border-radius: 9999px !important; }
+kbd { border: 1px solid #cbd5e1; background: #f8fafc; padding: 0 4px; font-size: 11px; }
+
+@utility btn { display: inline-flex; min-height: 32px; align-items: center; justify-content: center; gap: .5rem; border: 1px solid rgb(15 23 42 / 10%); padding: 8px 12px; font-size: 12px; font-weight: 500; line-height: 1; cursor: pointer; transition: background-color 150ms; &:disabled { cursor: not-allowed; opacity: .5; } }
+@utility btn-primary { @apply btn; border-color: #0d47a1; background: #0d47a1; color: #fff; &:hover:not(:disabled) { background: #0a3d8a; } }
+@utility btn-secondary { @apply btn; border-color: #cbd5e1; background: #fff; color: #0f172a; &:hover:not(:disabled) { background: #f8fafc; } }
+@utility btn-danger { @apply btn; border-color: #ef4444; background: #fee2e2; color: #b91c1c; }
+@utility btn-accent { @apply btn; border-color: #e6007e; background: #e6007e; color: #fff; &:hover:not(:disabled) { opacity: .9; } }
+@utility input { box-sizing: border-box; width: 100%; min-height: 30px; border: 1px solid #cbd5e1; background: #fff; padding: 4px 10px; font-size: 12px; color: #0f172a; outline: none; }
+@utility label { display: block; font-size: 12px; font-weight: 600; color: #475569; margin-bottom: 4px; }
+@utility card { border: 1px solid #e5e7eb; background: #fff; padding: 16px; box-shadow: 0 1px 2px rgb(0 0 0 / 5%); }
+@utility shell { border: 1px solid #b8d0e8; background: #f2f8ff; padding: 16px; }
+@utility th { padding: 6px 8px; font-weight: 600; white-space: nowrap; text-align: left; }
+@utility td { padding: 4px 8px; height: 27px; }
+@utility thead-navy { background: #0d47a1; color: #fff; font-size: 12px; }
+@utility trow { &:nth-child(odd) { background: #fff; } &:nth-child(even) { background: #f2f8ff; } &:hover { background: #e3eef8; } }
+
+@font-face { font-family: 'VSScript'; src: url('/fonts/GreatVibes-Regular.ttf') format('truetype'); font-display: swap; }
+.sig-script { font-family: 'VSScript', 'Segoe Script', cursive; }

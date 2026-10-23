@@ -1,0 +1,15 @@
+node_modules/
+.venv/
+venv/
+dist/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.db
+*.db-journal
+.env
+storage/
+sign_storage/
+*.log
+.coverage
+htmlcov/

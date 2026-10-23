@@ -1,0 +1,120 @@
+import { useEffect, useRef, useState } from 'react'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import { FiGrid, FiActivity, FiCheckSquare, FiUsers, FiCalendar, FiServer, FiBarChart2, FiEdit3, FiSettings, FiSliders, FiLogOut, FiBell, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
+import { useAuth } from '../auth'
+import api, { fmt } from '../api'
+import { theme } from '../theme'
+import { ROLE_LABEL } from '../constants'
+
+function Hero({ user, dept, right }) {
+  return (
+    <div className="relative w-full shrink-0 overflow-hidden" style={{ minHeight: 150 }}>
+      <img src={theme.hero} alt="" className="absolute inset-0 h-full w-full object-cover object-right" />
+      <div className="relative z-10 flex min-h-[150px] flex-wrap items-start justify-between gap-4 px-6 py-5 sm:px-8">
+        <div>
+          <div className="text-[18px] font-semibold text-slate-900">{user.full_name}</div>
+          <div className="mt-2 space-y-0.5 text-slate-500">
+            <p>Designation: {user.title || '—'}</p>
+            <p>Department: {dept || 'IT Service Management'}</p>
+            <p>Employee ID: VAICS-{String(user.id).padStart(4, '0')}</p>
+            <p>Active Role: {ROLE_LABEL[user.role]}{user.is_approver ? ' · Approver' : ''}</p>
+          </div>
+        </div>
+        {right}
+      </div>
+    </div>
+  )
+}
+
+export default function Layout() {
+  const { user, logout, isMgr } = useAuth()
+  const nav = useNavigate()
+  const [collapsed, setCollapsed] = useState(localStorage.getItem('cms_sidebar') === '1')
+  const [notes, setNotes] = useState([])
+  const [open, setOpen] = useState(false)
+  const [dept, setDept] = useState('')
+  const [help, setHelp] = useState(false)
+  const seq = useRef('')
+
+  const loadNotes = () => {}
+  useEffect(() => {
+    loadNotes(); const t = setInterval(loadNotes, 30000)
+    Promise.reject().then((r) => setDept(r.data.find((g) => g.kind === 'assignment' && g.member_ids.includes(user.id))?.name || r.data.find((g) => g.member_ids.includes(user.id))?.name || '')).catch(() => {})
+    return () => clearInterval(t)
+  }, []) // eslint-disable-line
+  // keyboard-first: g d / g c / g a / g b / g s, n = new change, / = search, ? = help
+  useEffect(() => {
+    const go = { d: '/vaics-sign', n: '/vaics-sign/new' }
+    const h = (e) => {
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName) || e.metaKey || e.ctrlKey) return
+      if (seq.current === 'g' && go[e.key]) { nav(go[e.key]); seq.current = ''; return }
+      seq.current = e.key === 'g' ? 'g' : ''
+      if (e.key === 'n' && user.role !== 'cab_member') nav('/vaics-sign/new')
+      if (e.key === '/') { e.preventDefault(); nav('/vaics-sign'); setTimeout(() => document.getElementById('list-search')?.focus(), 50) }
+      if (e.key === '?') setHelp((v) => !v)
+      if (e.key === 'Escape') { setHelp(false); setOpen(false) }
+    }
+    window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h)
+  }, [nav, user])
+
+  const toggle = () => { setCollapsed(!collapsed); localStorage.setItem('cms_sidebar', collapsed ? '0' : '1') }
+  const unread = notes.filter((n) => !n.is_read).length
+  const links = [['/vaics-sign', 'Dashboard', FiGrid], ['/vaics-sign/new', 'New document', FiEdit3], ['/vaics-sign/outbox', 'Email outbox', FiBell]]
+  const openNote = async (n) => { if (!n.is_read) await api.post(`/notifications/${n.id}/read`); setOpen(false); loadNotes(); if (n.change_id) nav(`/changes/${n.change_id}`) }
+
+  const bell = (
+    <div className="relative flex items-center gap-2">
+      <button className="btn-secondary" onClick={() => setHelp(true)} title="Keyboard shortcuts">?</button>
+      
+      {open && (
+        <div className="absolute top-10 right-0 z-40 max-h-96 w-80 overflow-auto border border-gray-200 bg-white shadow-lg">
+          <div className="flex items-center justify-between border-b px-3 py-2"><b>Notifications</b><button className="text-deep" onClick={async () => { await api.post('/notifications/read-all'); loadNotes() }}>Mark all read</button></div>
+          {notes.length === 0 && <p className="p-3 text-slate-400">No notifications</p>}
+          {notes.map((n) => <button key={n.id} onClick={() => openNote(n)} className={`block w-full px-3 py-2 text-left hover:bg-light-blue ${n.is_read ? 'text-slate-400' : 'font-medium'}`}>{n.message}<div className="text-[11px] text-slate-400">{fmt(n.created_at)}</div></button>)}
+        </div>
+      )}
+    </div>
+  )
+
+  return (
+    <div className="flex h-screen overflow-hidden bg-white">
+      <div className="relative z-20 h-screen shrink-0" style={{ width: collapsed ? 64 : 240, transition: 'width 200ms' }}>
+        <aside className="flex h-full flex-col overflow-hidden border-r border-blue-200 bg-white">
+          <div className={`px-2 pt-2 ${collapsed ? 'pb-14' : 'pb-2 pr-10'}`}>
+            {collapsed ? <img src={theme.logoIcon} alt="VAICS" className="round mx-auto h-10 w-10" />
+              : <><img src={theme.logoFull} alt="VAICS" className="h-12 w-[168px] object-contain object-left" /><p className="mt-0.5 ml-0.5 truncate font-medium tracking-wide">{theme.appName}</p></>}
+          </div>
+          <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-3">
+            {!collapsed && <div className="mb-1"><p className="px-2 font-semibold tracking-wider text-gray-400 uppercase">VAICS Sign</p><div className="mx-2 mt-1.5 border-t border-gray-200" /></div>}
+            {links.map(([to, label, Icon]) => (
+              <NavLink key={to} to={to} end title={collapsed ? label : undefined}
+                className={({ isActive }) => `flex items-center font-medium ${collapsed ? 'justify-center px-2 py-2.5' : 'gap-2 px-2 py-2'} ${isActive ? 'bg-rail-active text-deep' : 'text-[#0F172A] hover:bg-gray-50'}`}>
+                <span className="shrink-0 text-magenta"><Icon className="h-5 w-5" strokeWidth={2.25} /></span>{!collapsed && <span className="truncate">{label}</span>}
+              </NavLink>
+            ))}
+          </nav>
+          <div className="border-t border-gray-200 p-3">
+            {!collapsed && <><div className="font-semibold">{user.full_name}</div><div className="text-slate-500">{ROLE_LABEL[user.role]}</div></>}
+            <button onClick={() => { logout(); nav('/login') }} className={`mt-2 flex items-center gap-2 font-medium text-slate-700 hover:text-deep ${collapsed ? 'mx-auto' : ''}`} title="Sign out"><FiLogOut className="text-magenta" />{!collapsed && 'Sign out'}</button>
+          </div>
+        </aside>
+        <button onClick={toggle} className={`round absolute z-30 flex h-9 w-9 items-center justify-center border border-gray-300 bg-white shadow-sm hover:bg-gray-50 ${collapsed ? 'top-16 left-1/2 -translate-x-1/2' : 'top-8 right-0 translate-x-1/2 -translate-y-1/2'}`}>{collapsed ? <FiChevronRight /> : <FiChevronLeft />}</button>
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
+        <Hero user={user} dept={dept} right={bell} />
+        <main className="min-h-0 flex-1 overflow-y-auto p-6"><Outlet /></main>
+      </div>
+      {help && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40" onClick={() => setHelp(false)}>
+          <div className="w-96 border bg-white" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-deep px-4 py-2.5 font-semibold text-white">Keyboard shortcuts</div>
+            <table className="m-4 w-[calc(100%-2rem)]"><tbody>
+              {[['g d', 'Dashboard'], ['n', 'New document'], ['?', 'This help'], ['Esc', 'Close']].map(([k, l]) => (
+                <tr key={k}><td className="py-1"><kbd>{k}</kbd></td><td>{l}</td></tr>))}
+            </tbody></table>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
