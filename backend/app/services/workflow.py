@@ -309,6 +309,11 @@ def validate_value(f: Field, v: str) -> str | None:
         except ValueError: return "must be a number"
     if f.validation == "date" or f.type == "date":
         if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", v): return "must be a date (YYYY-MM-DD)"
+    india = {"pan": (r"[A-Z]{5}[0-9]{4}[A-Z]", "must be a valid PAN (e.g. ABCDE1234F)"),
+             "gstin": (r"\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]", "must be a valid GSTIN"),
+             "pincode": (r"[1-9]\d{5}", "must be a 6-digit PIN code"), "phone": (r"\+?[0-9 ()-]{7,20}", "must be a phone number")}
+    if f.validation in india and not re.fullmatch(india[f.validation][0], v.strip().upper() if f.validation in ("pan", "gstin") else v.strip()):
+        return india[f.validation][1]
     if f.validation == "regex" and f.regex:
         try:
             if not re.fullmatch(f.regex, v): return "has an invalid format"

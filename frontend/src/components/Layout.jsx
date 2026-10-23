@@ -1,23 +1,22 @@
-import { useEffect, useRef, useState } from 'react'
-import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { FiGrid, FiActivity, FiCheckSquare, FiUsers, FiCalendar, FiServer, FiBarChart2, FiEdit3, FiSettings, FiSliders, FiLogOut, FiBell, FiChevronLeft, FiChevronRight } from 'react-icons/fi'
-import { useAuth } from '../auth'
-import api, { fmt } from '../api'
+import { useEffect, useState } from 'react'
+import { NavLink, Outlet, useNavigate, Link } from 'react-router-dom'
+import { FiGrid, FiInbox, FiEdit3, FiLayers, FiUpload, FiLink, FiMail, FiBarChart2, FiUsers, FiCreditCard, FiSettings, FiShield, FiLogOut, FiBell, FiChevronLeft, FiChevronRight, FiUser, FiServer, FiCheckCircle, FiMenu } from 'react-icons/fi'
+import { useAuth, ROLE_LABEL } from '../auth'
+import api, { fmt, fmtDate } from '../api'
 import { theme } from '../theme'
-import { ROLE_LABEL } from '../constants'
 
-function Hero({ user, dept, right }) {
+function Hero({ user, right }) {
+  const org = user.org
   return (
-    <div className="relative w-full shrink-0 overflow-hidden" style={{ minHeight: 150 }}>
+    <div className="relative w-full shrink-0 overflow-hidden" style={{ minHeight: 120 }}>
       <img src={theme.hero} alt="" className="absolute inset-0 h-full w-full object-cover object-right" />
-      <div className="relative z-10 flex min-h-[150px] flex-wrap items-start justify-between gap-4 px-6 py-5 sm:px-8">
+      <div className="relative z-10 flex min-h-[120px] flex-wrap items-start justify-between gap-4 px-6 py-4 sm:px-8">
         <div>
           <div className="text-[18px] font-semibold text-slate-900">{user.full_name}</div>
-          <div className="mt-2 space-y-0.5 text-slate-500">
-            <p>Designation: {user.title || '—'}</p>
-            <p>Department: {dept || 'IT Service Management'}</p>
-            <p>Employee ID: VAICS-{String(user.id).padStart(4, '0')}</p>
-            <p>Active Role: {ROLE_LABEL[user.role]}{user.is_approver ? ' · Approver' : ''}</p>
+          <div className="mt-1.5 space-y-0.5 text-slate-500">
+            <p>{org ? org.name : 'VAICS platform operations'}</p>
+            <p>Role: {ROLE_LABEL[user.role] || user.role}</p>
+            {org && <p>Plan: {org.plan_name || '—'}{org.status === 'trial' && org.trial_ends_at ? ` · trial ends ${fmtDate(org.trial_ends_at)}` : ''}{org.is_sandbox ? ' · SANDBOX' : ''}</p>}
           </div>
         </div>
         {right}
@@ -27,94 +26,89 @@ function Hero({ user, dept, right }) {
 }
 
 export default function Layout() {
-  const { user, logout, isMgr } = useAuth()
+  const { user, logout, can, isPlatform } = useAuth()
   const nav = useNavigate()
-  const [collapsed, setCollapsed] = useState(localStorage.getItem('cms_sidebar') === '1')
+  const [collapsed, setCollapsed] = useState(localStorage.getItem('vs_sidebar') === '1')
+  const [mobile, setMobile] = useState(false)
   const [notes, setNotes] = useState([])
   const [open, setOpen] = useState(false)
-  const [dept, setDept] = useState('')
-  const [help, setHelp] = useState(false)
-  const seq = useRef('')
-
-  const loadNotes = () => {}
-  useEffect(() => {
-    loadNotes(); const t = setInterval(loadNotes, 30000)
-    Promise.reject().then((r) => setDept(r.data.find((g) => g.kind === 'assignment' && g.member_ids.includes(user.id))?.name || r.data.find((g) => g.member_ids.includes(user.id))?.name || '')).catch(() => {})
-    return () => clearInterval(t)
-  }, []) // eslint-disable-line
-  // keyboard-first: g d / g c / g a / g b / g s, n = new change, / = search, ? = help
-  useEffect(() => {
-    const go = { d: '/vaics-sign', n: '/vaics-sign/new' }
-    const h = (e) => {
-      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName) || e.metaKey || e.ctrlKey) return
-      if (seq.current === 'g' && go[e.key]) { nav(go[e.key]); seq.current = ''; return }
-      seq.current = e.key === 'g' ? 'g' : ''
-      if (e.key === 'n' && user.role !== 'cab_member') nav('/vaics-sign/new')
-      if (e.key === '/') { e.preventDefault(); nav('/vaics-sign'); setTimeout(() => document.getElementById('list-search')?.focus(), 50) }
-      if (e.key === '?') setHelp((v) => !v)
-      if (e.key === 'Escape') { setHelp(false); setOpen(false) }
-    }
-    window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h)
-  }, [nav, user])
-
-  const toggle = () => { setCollapsed(!collapsed); localStorage.setItem('cms_sidebar', collapsed ? '0' : '1') }
-  const unread = notes.filter((n) => !n.is_read).length
-  const links = [['/vaics-sign', 'Dashboard', FiGrid], ['/vaics-sign/new', 'New document', FiEdit3], ['/vaics-sign/outbox', 'Email outbox', FiBell]]
-  const openNote = async (n) => { if (!n.is_read) await api.post(`/notifications/${n.id}/read`); setOpen(false); loadNotes(); if (n.change_id) nav(`/changes/${n.change_id}`) }
-
+  const load = () => { if (!isPlatform) api.get('/org/notifications').then((r) => setNotes(r.data)).catch(() => {}) }
+  useEffect(() => { load(); const t = setInterval(load, 30000); return () => clearInterval(t) }, []) // eslint-disable-line
+  const toggle = () => { setCollapsed(!collapsed); localStorage.setItem('vs_sidebar', collapsed ? '0' : '1') }
+  const unread = notes.filter((n) => !n.read).length
+  const groups = isPlatform ? [['VAICS platform', [['/platform', 'Tenants & health', FiServer]]], ['Account', [['/account', 'My account', FiUser]]]] : [
+    ['VAICS Sign', [['/', 'Dashboard', FiGrid], ['/envelopes', 'Envelopes', FiInbox], can('envelopes.send') && ['/envelopes/new', 'New envelope', FiEdit3],
+      ['/templates', 'Templates', FiLayers], can('bulk.send') && ['/bulk', 'Bulk send', FiUpload], ['/powerforms', 'PowerForms', FiLink], ['/outbox', 'Email outbox', FiMail]]],
+    ['Insights', [can('reports.view') && ['/reports', 'Reports', FiBarChart2], ['/verify', 'Verify a document', FiCheckCircle]]],
+    ['Administration', [can('users.manage') && ['/admin/users', 'Users & groups', FiUsers], can('settings.manage') && ['/admin/settings', 'Settings & branding', FiSettings],
+      can('integrations.manage') && ['/admin/integrations', 'API & webhooks', FiLink], (can('audit.view') && user.role !== 'sender') && ['/admin/audit', 'Admin audit log', FiShield],
+      can('privacy.manage') && ['/admin/privacy', 'Privacy & retention', FiShield], can('billing.manage') && ['/admin/billing', 'Plan & billing', FiCreditCard], ['/account', 'My account', FiUser]]],
+  ]
+  const org = user.org
+  const banner = org && (org.status === 'past_due' ? 'Payment is past due. Update billing to avoid restriction.' : org.status === 'restricted' ? 'Your organization is restricted: sending is disabled until payment is made.'
+    : org.status === 'suspended' ? 'Your organization is suspended. Contact VAICS support.' : !user.email_verified ? 'Verify your email address to send documents.' : '')
   const bell = (
     <div className="relative flex items-center gap-2">
-      <button className="btn-secondary" onClick={() => setHelp(true)} title="Keyboard shortcuts">?</button>
-      
+      <button className="btn-secondary relative" onClick={() => setOpen(!open)} aria-label="Notifications"><FiBell />{unread > 0 && <span className="round absolute -top-1.5 -right-1.5 bg-[#E6007E] px-1.5 text-[10px] text-white">{unread}</span>}</button>
       {open && (
         <div className="absolute top-10 right-0 z-40 max-h-96 w-80 overflow-auto border border-gray-200 bg-white shadow-lg">
-          <div className="flex items-center justify-between border-b px-3 py-2"><b>Notifications</b><button className="text-deep" onClick={async () => { await api.post('/notifications/read-all'); loadNotes() }}>Mark all read</button></div>
+          <div className="flex items-center justify-between border-b px-3 py-2"><b>Notifications</b><button className="text-[#0D47A1]" onClick={async () => { await api.post('/org/notifications/read-all'); load() }}>Mark all read</button></div>
           {notes.length === 0 && <p className="p-3 text-slate-400">No notifications</p>}
-          {notes.map((n) => <button key={n.id} onClick={() => openNote(n)} className={`block w-full px-3 py-2 text-left hover:bg-light-blue ${n.is_read ? 'text-slate-400' : 'font-medium'}`}>{n.message}<div className="text-[11px] text-slate-400">{fmt(n.created_at)}</div></button>)}
+          {notes.map((n) => <button key={n.id} onClick={() => { setOpen(false); if (n.envelope_id) nav(`/envelopes/${n.envelope_id}`) }} className={`block w-full px-3 py-2 text-left hover:bg-[#F2F8FF] ${n.read ? 'text-slate-400' : 'font-medium'}`}>{n.text}<div className="text-[11px] text-slate-400">{fmt(n.created_at)}</div></button>)}
         </div>
       )}
     </div>
   )
-
+  const side = (
+    <aside className="flex h-full flex-col overflow-hidden border-r border-blue-200 bg-white">
+      <div className={`px-2 pt-2 ${collapsed ? 'pb-14' : 'pb-2 pr-10'}`}>
+        {collapsed ? <img src={theme.logoIcon} alt="VAICS" className="round mx-auto h-10 w-10" />
+          : <><img src={theme.logoFull} alt="VAICS" className="h-12 w-[168px] object-contain object-left" /><p className="mt-0.5 ml-0.5 truncate font-medium tracking-wide">{theme.appName}</p></>}
+      </div>
+      <nav className="flex-1 space-y-3 overflow-y-auto px-2 py-2">
+        {groups.map(([g, links]) => (
+          <div key={g}>
+            {!collapsed && <div className="mb-1"><p className="px-2 font-semibold tracking-wider text-gray-400 uppercase">{g}</p><div className="mx-2 mt-1.5 border-t border-gray-200" /></div>}
+            {links.filter(Boolean).map(([to, label, Icon]) => (
+              <NavLink key={to} to={to} end onClick={() => setMobile(false)} title={collapsed ? label : undefined}
+                className={({ isActive }) => `flex items-center font-medium ${collapsed ? 'justify-center px-2 py-2.5' : 'gap-2 px-2 py-2'} ${isActive ? 'bg-[#D6E8FF] text-[#0D47A1]' : 'text-[#0F172A] hover:bg-gray-50'}`}>
+                <span className="shrink-0 text-[#E6007E]"><Icon className="h-5 w-5" strokeWidth={2.25} /></span>{!collapsed && <span className="truncate">{label}</span>}
+              </NavLink>))}
+          </div>))}
+      </nav>
+      <div className="border-t border-gray-200 p-3">
+        {!collapsed && <><div className="font-semibold">{user.full_name}</div><div className="truncate text-slate-500">{user.email}</div></>}
+        <button onClick={async () => { await logout(); nav('/login') }} className={`mt-2 flex items-center gap-2 font-medium text-slate-700 hover:text-[#0D47A1] ${collapsed ? 'mx-auto' : ''}`} title="Sign out"><FiLogOut className="text-[#E6007E]" />{!collapsed && 'Sign out'}</button>
+      </div>
+    </aside>
+  )
   return (
     <div className="flex h-screen overflow-hidden bg-white">
-      <div className="relative z-20 h-screen shrink-0" style={{ width: collapsed ? 64 : 240, transition: 'width 200ms' }}>
-        <aside className="flex h-full flex-col overflow-hidden border-r border-blue-200 bg-white">
-          <div className={`px-2 pt-2 ${collapsed ? 'pb-14' : 'pb-2 pr-10'}`}>
-            {collapsed ? <img src={theme.logoIcon} alt="VAICS" className="round mx-auto h-10 w-10" />
-              : <><img src={theme.logoFull} alt="VAICS" className="h-12 w-[168px] object-contain object-left" /><p className="mt-0.5 ml-0.5 truncate font-medium tracking-wide">{theme.appName}</p></>}
-          </div>
-          <nav className="flex-1 space-y-0.5 overflow-y-auto px-2 py-3">
-            {!collapsed && <div className="mb-1"><p className="px-2 font-semibold tracking-wider text-gray-400 uppercase">VAICS Sign</p><div className="mx-2 mt-1.5 border-t border-gray-200" /></div>}
-            {links.map(([to, label, Icon]) => (
-              <NavLink key={to} to={to} end title={collapsed ? label : undefined}
-                className={({ isActive }) => `flex items-center font-medium ${collapsed ? 'justify-center px-2 py-2.5' : 'gap-2 px-2 py-2'} ${isActive ? 'bg-rail-active text-deep' : 'text-[#0F172A] hover:bg-gray-50'}`}>
-                <span className="shrink-0 text-magenta"><Icon className="h-5 w-5" strokeWidth={2.25} /></span>{!collapsed && <span className="truncate">{label}</span>}
-              </NavLink>
-            ))}
-          </nav>
-          <div className="border-t border-gray-200 p-3">
-            {!collapsed && <><div className="font-semibold">{user.full_name}</div><div className="text-slate-500">{ROLE_LABEL[user.role]}</div></>}
-            <button onClick={() => { logout(); nav('/login') }} className={`mt-2 flex items-center gap-2 font-medium text-slate-700 hover:text-deep ${collapsed ? 'mx-auto' : ''}`} title="Sign out"><FiLogOut className="text-magenta" />{!collapsed && 'Sign out'}</button>
-          </div>
-        </aside>
-        <button onClick={toggle} className={`round absolute z-30 flex h-9 w-9 items-center justify-center border border-gray-300 bg-white shadow-sm hover:bg-gray-50 ${collapsed ? 'top-16 left-1/2 -translate-x-1/2' : 'top-8 right-0 translate-x-1/2 -translate-y-1/2'}`}>{collapsed ? <FiChevronRight /> : <FiChevronLeft />}</button>
+      <div className="relative z-20 hidden h-screen shrink-0 md:block" style={{ width: collapsed ? 64 : 240, transition: 'width 200ms' }}>
+        {side}
+        <button onClick={toggle} aria-label="Toggle sidebar" className={`round absolute z-30 flex h-9 w-9 items-center justify-center border border-gray-300 bg-white shadow-sm hover:bg-gray-50 ${collapsed ? 'top-16 left-1/2 -translate-x-1/2' : 'top-8 right-0 translate-x-1/2 -translate-y-1/2'}`}>{collapsed ? <FiChevronRight /> : <FiChevronLeft />}</button>
       </div>
+      {mobile && <div className="fixed inset-0 z-40 flex md:hidden" onClick={() => setMobile(false)}><div className="h-full w-64" onClick={(e) => e.stopPropagation()}>{side}</div><div className="flex-1 bg-slate-900/40" /></div>}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        <Hero user={user} dept={dept} right={bell} />
-        <main className="min-h-0 flex-1 overflow-y-auto p-6"><Outlet /></main>
+        <div className="flex items-center gap-2 border-b border-blue-200 px-3 py-2 md:hidden"><button className="btn-secondary" onClick={() => setMobile(true)} aria-label="Menu"><FiMenu /></button><img src={theme.logoFull} alt="VAICS" className="h-8" /></div>
+        <Hero user={user} right={bell} />
+        {banner && <div className="border-y border-amber-200 bg-amber-50 px-6 py-2 font-medium text-amber-800">{banner} {can('billing.manage') && org?.status !== 'suspended' && user.email_verified && <Link className="underline" to="/admin/billing">Billing</Link>}</div>}
+        <main className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6"><Outlet /></main>
       </div>
-      {help && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40" onClick={() => setHelp(false)}>
-          <div className="w-96 border bg-white" onClick={(e) => e.stopPropagation()}>
-            <div className="bg-deep px-4 py-2.5 font-semibold text-white">Keyboard shortcuts</div>
-            <table className="m-4 w-[calc(100%-2rem)]"><tbody>
-              {[['g d', 'Dashboard'], ['n', 'New document'], ['?', 'This help'], ['Esc', 'Close']].map(([k, l]) => (
-                <tr key={k}><td className="py-1"><kbd>{k}</kbd></td><td>{l}</td></tr>))}
-            </tbody></table>
-          </div>
-        </div>
-      )}
+    </div>
+  )
+}
+
+export function PublicShell({ brand, children, wide }) {
+  return (
+    <div className="min-h-screen bg-[#F2F8FF]">
+      <header className="flex items-center gap-3 px-4 py-2" style={{ background: brand?.primary || '#0D47A1' }}>
+        <img src={brand?.logo_url || '/vaics-logo-full.png'} alt={brand?.org_name || 'VAICS'} className="h-9 bg-white p-1" />
+        <span className="font-semibold text-white">{brand?.product_name || 'VAICS Sign'}</span>
+        <span className="ml-auto truncate text-white/80">{brand?.org_name}</span>
+      </header>
+      <main className={`mx-auto space-y-4 p-4 ${wide ? 'max-w-6xl' : 'max-w-5xl'}`}>{children}</main>
+      <footer className="pb-6 text-center text-slate-400">Powered by VAICS Sign · <a className="underline" href="/verify">Verify a document</a></footer>
     </div>
   )
 }

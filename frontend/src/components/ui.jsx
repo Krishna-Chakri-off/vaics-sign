@@ -1,9 +1,6 @@
+import { useEffect, useState } from 'react'
 import { FiInbox } from 'react-icons/fi'
-import { LABEL, STATE_STYLE, RISK_LABEL, RISK_STYLE } from '../constants'
 
-export const StateBadge = ({ state }) => <span className={`inline-block border px-2 py-0.5 font-medium whitespace-nowrap ${STATE_STYLE[state] || ''}`}>{LABEL[state] || state}</span>
-export const RiskBadge = ({ risk }) => <span className={`inline-block border px-2 py-0.5 font-medium whitespace-nowrap ${RISK_STYLE[risk] || 'border-slate-300'}`}>{RISK_LABEL[risk] || risk || '—'}</span>
-export const TypeTag = ({ type }) => <span className={`font-medium capitalize ${type === 'emergency' ? 'text-red-600' : type === 'standard' ? 'text-green-700' : 'text-slate-700'}`}>{type}</span>
 
 export function PageShell({ title, subtitle, right, children }) {
   return (
@@ -46,7 +43,7 @@ export const Section = ({ title, right, children }) => (
 export function Modal({ title, onClose, children, footer }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4" onClick={onClose}>
-      <div className="w-full max-w-lg border border-gray-200 bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
+      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto border border-gray-200 bg-white shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="border-b border-gray-200 bg-deep px-4 py-2.5 font-semibold text-white">{title}</div>
         <div className="space-y-3 p-4">{children}</div>
         {footer && <div className="flex justify-end gap-2 border-t border-gray-200 px-4 py-3">{footer}</div>}
@@ -57,3 +54,31 @@ export function Modal({ title, onClose, children, footer }) {
 
 export const Field = ({ label, children, className = '' }) => <div className={className}><label className="label">{label}</label>{children}</div>
 export const ReadField = ({ label, children }) => <div><div className="text-slate-500">{label}</div><div className="font-medium">{children || '—'}</div></div>
+
+export const STATUS = {
+  draft: ['Draft', 'border-slate-300 bg-slate-50 text-slate-700'], sent: ['Sent', 'border-blue-200 bg-blue-50 text-[#0D47A1]'], delivered: ['Opened', 'border-sky-200 bg-sky-50 text-sky-700'],
+  partially_signed: ['Partially signed', 'border-amber-200 bg-amber-50 text-amber-800'], completed: ['Completed', 'border-green-200 bg-green-50 text-green-800'],
+  declined: ['Declined', 'border-red-200 bg-red-50 text-red-700'], voided: ['Voided', 'border-slate-300 bg-slate-100 text-slate-600'], expired: ['Expired', 'border-slate-300 bg-slate-100 text-slate-600'],
+  created: ['Waiting', 'border-slate-300 text-slate-600'], authenticated: ['Authenticated', 'border-sky-200 bg-sky-50 text-sky-700'],
+  pending: ['Pending', 'border-slate-300 text-slate-600'], validated: ['Validated', 'border-sky-200 bg-sky-50 text-sky-700'], done: ['Done', 'border-green-200 bg-green-50 text-green-800'],
+  delivered_wh: ['Delivered', 'border-green-200 bg-green-50 text-green-800'], retrying: ['Retrying', 'border-amber-200 bg-amber-50 text-amber-800'], failed: ['Failed', 'border-red-200 bg-red-50 text-red-700'],
+  open: ['Open', 'border-amber-200 bg-amber-50 text-amber-800'], paid: ['Paid', 'border-green-200 bg-green-50 text-green-800'], trial: ['Trial', 'border-sky-200 bg-sky-50 text-sky-700'],
+  active: ['Active', 'border-green-200 bg-green-50 text-green-800'], past_due: ['Past due', 'border-red-200 bg-red-50 text-red-700'], restricted: ['Restricted', 'border-red-200 bg-red-50 text-red-700'],
+  suspended: ['Suspended', 'border-red-200 bg-red-50 text-red-700'], closed: ['Closed', 'border-slate-300 bg-slate-100 text-slate-600'], dev_outbox: ['Dev outbox (not sent)', 'border-amber-200 bg-amber-50 text-amber-800'],
+  accepted: ['Accepted by SMTP', 'border-green-200 bg-green-50 text-green-800'],
+}
+export const SBadge = ({ s, label }) => <span className={`round inline-block border px-2 py-0.5 font-medium whitespace-nowrap ${STATUS[s]?.[1] || 'border-slate-300'}`}>{label || STATUS[s]?.[0] || s}</span>
+export const COLORS = ['#0D47A1', '#E6007E', '#00B6F0', '#7C3AED', '#059669', '#B45309']
+export const Tabs = ({ tabs, value, onChange }) => (
+  <div className="flex flex-wrap gap-0 border-b border-[#B8D0E8]">{tabs.map(([k, l]) => (
+    <button key={k} onClick={() => onChange(k)} className={`-mb-px border-b-2 px-3 py-2 font-medium ${value === k ? 'border-[#E6007E] text-[#0D47A1]' : 'border-transparent text-slate-600 hover:text-[#0D47A1]'}`}>{l}</button>))}</div>
+)
+export const Stat = ({ label, value, hint, onClick }) => (
+  <button onClick={onClick} className="card text-left hover:border-[#0D47A1]"><div className="text-slate-500">{label}</div><div className="mt-1 text-[22px] font-semibold text-[#0D47A1]">{value}</div>{hint && <div className="text-slate-400">{hint}</div>}</button>
+)
+export function useAsync(fn, deps = []) {
+  const [state, setState] = useState({ data: null, err: '', loading: true })
+  const run = () => { setState((s) => ({ ...s, loading: true })); return fn().then((data) => setState({ data, err: '', loading: false })).catch((e) => setState({ data: null, err: e?.response?.data?.detail?.message || e?.response?.data?.detail || e.message, loading: false })) }
+  useEffect(() => { run() }, deps) // eslint-disable-line
+  return { ...state, reload: run }
+}

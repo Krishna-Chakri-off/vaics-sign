@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* VAICS CMS look (matches the original VAICS Change Management System) */
+/* VAICS brand: primary #0D47A1, magenta #E6007E, sky #00B6F0, Segoe UI 12/14px, square corners */
 @theme {
   --color-light-blue: #f2f8ff;
   --color-rail-active: #d6e8ff;
@@ -45,3 +45,9 @@ kbd { border: 1px solid #cbd5e1; background: #f8fafc; padding: 0 4px; font-size:
 
 @font-face { font-family: 'VSScript'; src: url('/fonts/GreatVibes-Regular.ttf') format('truetype'); font-display: swap; }
 .sig-script { font-family: 'VSScript', 'Segoe Script', cursive; }
+@font-face { font-family: 'VSAllura'; src: url('/fonts/Allura-Regular.ttf') format('truetype'); font-display: swap; }
+@font-face { font-family: 'VSSacramento'; src: url('/fonts/Sacramento-Regular.ttf') format('truetype'); font-display: swap; }
+.sig-great_vibes { font-family: 'VSScript', cursive; }
+.sig-allura { font-family: 'VSAllura', cursive; }
+.sig-sacramento { font-family: 'VSSacramento', cursive; }
+@media (max-width: 640px) { body { font-size: 13px; } }
