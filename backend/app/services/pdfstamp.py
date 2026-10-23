@@ -62,8 +62,8 @@ def draw_signature(c, r, x, y, w, h, initials=False, color="#0D47A1"):
         return
     font = f"sig_{r.signature_style if r.signature_style in SIG_FONTS else 'great_vibes'}"
     text = (r.initials or "".join(p[0] for p in r.name.split() if p).upper()) if initials else r.name
-    size = _fit(text, font, min(h * 0.95, 44), w - 4, 6)
-    c.setFillColor(HexColor(color)); c.setFont(font, size); c.drawString(x + 2, y + max(1, (h - size) * 0.35), text)
+    size = _fit(text, font, min(h * 0.72, 44), w - 4, 6)  # script fonts: ~0.3em descender, keep clear of the text below
+    c.setFillColor(HexColor(color)); c.setFont(font, size); c.drawString(x + 2, y + size * 0.3 + 1, text)
 
 
 def stamp_document(src: bytes, fields, recipients: dict, tz: str, brand: dict) -> bytes:
