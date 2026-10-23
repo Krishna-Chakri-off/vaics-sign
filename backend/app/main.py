@@ -33,6 +33,8 @@ def health():
 
 @app.on_event("startup")
 def startup():
+    if settings.ENV == "production" and (settings.SECRET_KEY.startswith("dev-") or len(settings.SECRET_KEY) < 32):
+        raise RuntimeError("Set a strong SECRET_KEY (>= 32 chars) in production")
     from . import models  # noqa: F401
     if settings.AUTO_CREATE_TABLES:
         Base.metadata.create_all(bind=engine)

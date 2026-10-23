@@ -1,6 +1,6 @@
 import io, os, tempfile
 _tmp = tempfile.mkdtemp(prefix="vaics-test-")
-os.environ.update({"DATABASE_URL": f"sqlite:///{_tmp}/test.db", "STORAGE_DIR": f"{_tmp}/storage", "ENV": "test", "SECRET_KEY": "test-secret-not-for-production",
+os.environ.update({"DATABASE_URL": os.environ.get("TEST_DATABASE_URL") or f"sqlite:///{_tmp}/test.db", "STORAGE_DIR": f"{_tmp}/storage", "ENV": "test", "SECRET_KEY": "test-secret-not-for-production",
                    "RATE_LIMIT_ENABLED": "false", "AUTO_CREATE_TABLES": "true", "SMTP_HOST": "", "HIBP_CHECK": "false", "PUBLIC_APP_URL": "http://app.test"})
 import pytest
 from fastapi.testclient import TestClient
