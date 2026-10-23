@@ -51,16 +51,16 @@ def ensure_plans(db=None):
 
 def demo(db, password: str):
     biz = db.query(Plan).filter_by(code="business").first()
-    if not db.query(User).filter_by(email="platform@vaics.local").first():
-        db.add(User(org_id=None, email="platform@vaics.local", full_name="VAICS Platform Admin", role="platform_admin", password_hash=hash_password(password),
+    if not db.query(User).filter_by(email="platform@example.com").first():
+        db.add(User(org_id=None, email="platform@example.com", full_name="VAICS Platform Admin", role="platform_admin", password_hash=hash_password(password),
                     email_verified=True, password_changed_at=now()))
     org = db.query(Organization).filter_by(slug="vaics-consulting").first()
     if not org:
         org = Organization(name="VAICS Consulting", slug="vaics-consulting", country="IN", region="in", status="active", plan_id=biz.id, seats=10, currency="INR",
                            current_period_end=now() + timedelta(days=30), billing_state_code="36")
         db.add(org); db.flush()
-    people = [("krishna@vaics.local", "Krishna", "org_admin"), ("sender@vaics.local", "Demo Sender", "sender"),
-              ("auditor@vaics.local", "Demo Auditor", "auditor"), ("templates@vaics.local", "Template Manager", "template_manager")]
+    people = [("krishna@example.com", "Krishna", "org_admin"), ("sender@example.com", "Demo Sender", "sender"),
+              ("auditor@example.com", "Demo Auditor", "auditor"), ("templates@example.com", "Template Manager", "template_manager")]
     for email, name, role in people:
         if not db.query(User).filter_by(email=email).first():
             db.add(User(org_id=org.id, email=email, full_name=name, role=role, password_hash=hash_password(password), email_verified=True, password_changed_at=now()))
@@ -77,5 +77,5 @@ if __name__ == "__main__":
         if not pw:
             sys.exit("Set DEMO_PASSWORD (min 12 chars) to create demo users")
         demo(db, pw)
-        print("Demo users: platform@vaics.local, krishna@vaics.local, sender@vaics.local, auditor@vaics.local, templates@vaics.local (password = $DEMO_PASSWORD)")
+        print("Demo users: platform@example.com, krishna@example.com, sender@example.com, auditor@example.com, templates@example.com (password = $DEMO_PASSWORD)")
     print("Seed complete")

@@ -21,7 +21,8 @@ async def verify_upload(file: UploadFile = File(...), db: Session = Depends(get_
     if len(data) > 100 * 1024 * 1024: raise HTTPException(413, "File too large")
     h = sha256_hex(data)
     e = db.query(Envelope).filter_by(completed_sha256=h).first()
-    sig = seal.validate(data)
+    from starlette.concurrency import run_in_threadpool
+    sig = await run_in_threadpool(seal.validate, data)
     return {"sha256": h, "matches_record": bool(e), "record": _env_info(db, e) if e else None, "signature": sig,
             "verdict": ("authentic" if e and all(x.get("intact") for x in sig.get("results", [])) else "unknown_or_modified"),
             "note": "A match means this exact file was issued by VAICS Sign. Any change to the file breaks the match." }
