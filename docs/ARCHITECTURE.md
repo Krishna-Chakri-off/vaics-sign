@@ -1,15 +1,10 @@
-# VAICS Sign – Architecture
-**Backend** (FastAPI, `CMS-Backend`): `app/main.py` mounts only `auth` (CMS login/users/JWT) and `sign` (`app/routers/sign.py`, prefix `/api/v1/sign`). Models in `app/sign_models.py`. Settings `SignSettings` in `app/config.py`. Tables auto-created at startup + `ensure_columns()` adds new columns to existing sign tables (no Alembic migration yet). PDF stamping: pypdf + reportlab, script font `app/assets/GreatVibes-Regular.ttf` (SIL OFL).
-**Frontend** (React/Vite, `CMS-Frontend`): routes `/login`, `/vaics-sign` (dashboard), `/vaics-sign/new` (upload), `/vaics-sign/:id` (prepare on rendered PDF / track / audit), `/vaics-sign/outbox`, public `/sign/:token` (signer portal), `/sign-download/:t`. PDF rendering: `pdfjs-dist` in `pages/sign/PdfPages.jsx`.
-
-## Data model
-- `sign_documents`: org, owner (requester), status, original file path + SHA-256, `version_hash` (rolls forward after each signer), completed file + SHA-256, expiry.
-- `sign_recipients` (signers, strict `order`): status, token_hash/expiry/revoked, `code_hash` (HMAC-SHA256 with SECRET_KEY), code expiry, attempts, locked, session_hash/expiry (after code), download_hash/expiry, signed_at/IP.
-- `sign_fields`: recipient, page, x, y, w, h (fractions of page, origin top-left), reason, signed_at, field_hash.
-- `sign_audit_events`: event, actor, IP, UA, doc hash, prev_hash, entry_hash (hash chain).
-- `sign_emails`: every generated email (to, kind, subject, body, link, attachment, delivery = smtp_accepted | smtp_failed | dev_outbox; `code` only stored in dev-outbox mode).
-
-## Lifecycle
-draft → (Generate) sent → viewed (signer unlocked with code) → partially_signed → completed; or declined / cancelled / expired.
-Signer turn: only the lowest-order unsigned signer has a valid link; `by_token` rejects anyone else ("not your turn"). On sign: token + session revoked, field hashes computed, `notify_next` issues link + code to the next signer. After the last signer `finalize()` stamps the original (original never modified), appends certificate, stores result and emails requester + all signers.
-Field hash = SHA-256(version_hash | recipient id | email | name | field id | UTC timestamp | reason). Version hash after signer = SHA-256(previous version hash + that signer's field hashes).
+# Architecture
+- **backend/app**: FastAPI. Routers in `api/`, mounted under `/api/v1`: auth, org/admin, envelopes, signing (public), templates/bulk/powerforms, billing, reports, verify, privacy, platform. Business logic is in `services/`: workflow (routing state machine), documents (upload/convert/scan), pdfstamp (stamps and certificate), seal (pyHanko PAdES), mailer (SMTP/dev outbox), sms, billing/tax, usage metering, webhooks, retention, jobs, trust (provider interfaces), storage (local/S3 by region).
+- **Tenancy**: every tenant row carries `org_id`. All queries are scoped through `deps.current_user` / API key → org. Tests check cross-tenant access returns 404.
+- **Auth**: bcrypt passwords; JWT bound to a server-side `UserSession` (sid), so revocation and idle/absolute timeouts work. Optional TOTP. Role permissions are in `core/permissions` (mirrored in `frontend/src/auth.jsx`).
+- **Signing**: link token of 256 bits (only the hash is stored) + access code (keyed HMAC, attempt limit) or email/SMS OTP → a short signer session. Routing by `order` (same order = parallel). Each field signature computes a SHA-256 over the doc version, field, signer and time. Audit events are hash-chained.
+- **Finalization**: stamp the fields, append the certificate, PAdES-seal the PDF, store it (WORM via S3 Object Lock if configured), then email all parties.
+- **Integrations**: API keys (hashed, scoped), HMAC-signed webhooks (`X-VAICS-Signature: t=..,v1=..`) with retry/back-off, and an Idempotency-Key on create.
+- **DB**: SQLAlchemy 2 + Alembic (`0001_initial_schema`), verified up/down on PostgreSQL 17 and SQLite.
+- **Frontend**: React 19 + Vite + Tailwind 4, pdf.js rendering, pointer events for touch placement, i18n en/hi. Brand: #0D47A1 / #E6007E / #00B6F0, Segoe UI, square corners.
+- **Known architectural limits**: the rate limiter is in-process (use Redis or a gateway in production); jobs use an in-process scheduler or cron, with no queue; the bearer token is kept in localStorage (no HttpOnly cookie).

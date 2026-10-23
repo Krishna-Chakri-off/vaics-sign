@@ -1,0 +1,13 @@
+# Security
+- No secrets in code. `.env.example` files contain only placeholders. Production startup refuses default or short `SECRET_KEY`s.
+- Passwords: bcrypt, policy, history, lockout after failures. HIBP check optional.
+- Sessions: server-side sids, idle (30 min) and absolute (12 h) timeouts, listing and revocation. TOTP MFA, which an org can enforce.
+- Signing links: 256-bit random tokens (only the hash is stored), expiring. Access codes and OTPs are keyed-HMAC hashed, with 5 attempts then lockout until reissue, and are sent separately from links.
+- Tenant isolation in every query (tested). RBAC for permissions. Platform staff cannot see document content without time-limited, logged support access.
+- Headers: CSP, X-Frame-Options DENY, nosniff, Referrer-Policy, HSTS in production. CORS allow-list.
+- Rate limiting on auth and public endpoints (in-process; not shared across workers).
+- Uploads: size limits, type/integrity checks, optional ClamAV.
+- Integrity: SHA-256 of originals and fields, hash-chained audit, PAdES seal (dev self-signed by default; configure a real certificate and TSA for production), optional S3 Object Lock.
+- Webhooks are HMAC-signed with a timestamp. API keys are stored hashed.
+- Privacy: DSR access/correct/erase, org export, retention purge, deletion records.
+- **Open items**: HttpOnly cookie sessions, a shared (Redis) rate limiter, passkeys/SMS MFA, SSO/SCIM, WAF/pen test, real seal certificate/HSM, and external audit (ISO 27001/SOC 2) not done.
