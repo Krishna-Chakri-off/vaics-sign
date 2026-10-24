@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     # --- core ---
     ENV: str = "development"  # development | test | production
     APP_NAME: str = "VAICS Sign"
+    SAAS_MODE: bool = False  # Phase 1 = internal VAICS-only: public sign-up, billing and platform console are disabled
     DATABASE_URL: str = "sqlite:///./vaics_sign.db"
     SECRET_KEY: str = "dev-only-change-me"
     PUBLIC_APP_URL: str = "http://localhost:5175"  # frontend base URL used in emails

@@ -77,6 +77,8 @@ class SignupIn(BaseModel):
 
 @router.post("/signup", status_code=201)
 def signup(body: SignupIn, request: Request, db: Session = Depends(get_db)):
+    if not settings.SAAS_MODE:
+        raise HTTPException(404, "Self-service sign-up is disabled. Ask a VAICS Sign administrator for an invitation.")
     if not body.accept_terms:
         raise HTTPException(422, "Accept the Terms of Service, Privacy Policy and Data Processing Agreement")
     email = str(body.email).lower()

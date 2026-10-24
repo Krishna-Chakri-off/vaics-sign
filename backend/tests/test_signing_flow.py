@@ -93,7 +93,7 @@ def test_reason_required(client):
     client.post(f"/api/v1/envelopes/{env['id']}/send", headers=h)
     tok, _ = link_and_code("ravi@example.com")
     s = client.post(f"/api/v1/public/s/{tok}/open").json()["session"]
-    r = client.post(f"/api/v1/public/s/{tok}/finish", json={"consent": True, "signature": {"kind": "typed"}, "reasons": {}}, headers={"X-Signer-Session": s})
+    r = client.post(f"/api/v1/public/s/{tok}/finish", json={"consent": True, "intent": True, "signature": {"kind": "typed"}, "reasons": {}}, headers={"X-Signer-Session": s})
     assert r.status_code == 422 and "reason" in r.text.lower()
 
 
@@ -166,7 +166,7 @@ def test_in_person(client):
     tok, sess = r.json()["token"], r.json()["session"]
     sh = {"X-Signer-Session": sess}
     fields = client.get(f"/api/v1/public/s/{tok}/envelope", headers=sh).json()["fields"]
-    out = client.post(f"/api/v1/public/s/{tok}/finish", json={"consent": True, "signature": {"kind": "typed"}, "reasons": {f["id"]: "In person" for f in fields}}, headers=sh)
+    out = client.post(f"/api/v1/public/s/{tok}/finish", json={"consent": True, "intent": True, "signature": {"kind": "typed"}, "reasons": {f["id"]: "In person" for f in fields}}, headers=sh)
     assert out.status_code == 200 and out.json()["completed"]
 
 

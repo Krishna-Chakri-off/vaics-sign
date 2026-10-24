@@ -7,21 +7,25 @@ import { Alert, Field } from '../components/ui'
 
 export function AuthCard({ title, subtitle, children }) {
   return (
-    <div className="flex min-h-screen flex-col bg-[#F2F8FF] md:flex-row">
-      <div className="relative hidden flex-1 overflow-hidden md:block">
-        <img src={theme.hero} alt="" className="absolute inset-0 h-full w-full object-cover" />
-        <div className="absolute bottom-10 left-10 max-w-md bg-white/85 p-6">
-          <img src={theme.logoFull} alt="VAICS" className="h-12" />
-          <p className="mt-3 text-[18px] font-semibold text-[#0D47A1]">VAICS Sign</p>
-          <p className="mt-1 text-slate-600">Send, sign and track documents with a tamper-evident audit trail, sequential and parallel routing, and a Certificate of Completion for every envelope.</p>
+    <div className="flex min-h-screen bg-white">
+      <div className="relative hidden w-[46%] flex-col justify-between overflow-hidden bg-[#0D47A1] p-14 text-white lg:flex">
+        <div className="pointer-events-none absolute -right-40 -bottom-40 h-[520px] w-[520px] round border border-white/10" />
+        <div className="pointer-events-none absolute -right-20 -bottom-20 h-[360px] w-[360px] round border border-white/10" />
+        <div className="inline-flex w-fit bg-white px-4 py-3"><img src={theme.logoFull} alt="VAICS" className="h-9" /></div>
+        <div className="relative max-w-md space-y-5">
+          <div className="h-[3px] w-12 bg-[#00B6F0]" />
+          <h1 className="text-[34px] leading-tight font-semibold !text-white">Sign with confidence.</h1>
+          <p className="text-[16px] leading-relaxed text-white/80">VAICS Sign sends documents to the VAICS representative and the countersigner in order, stamps every signature with its reason, time and SHA-256 fingerprint, and keeps a tamper-evident audit trail.</p>
         </div>
+        <div className="relative text-[12px] text-white/60">© {new Date().getFullYear()} {theme.company} · Internal use only</div>
       </div>
-      <div className="flex w-full items-center justify-center p-6 md:w-[480px]">
-        <div className="card w-full max-w-sm space-y-4">
-          <img src={theme.logoFull} alt="VAICS" className="h-10 md:hidden" />
-          <div><h1>{title}</h1>{subtitle && <p className="mt-1 text-slate-500">{subtitle}</p>}</div>
+      <div className="flex flex-1 flex-col items-center justify-center px-6 py-12">
+        <div className="w-full max-w-[380px] space-y-7">
+          <img src={theme.logoFull} alt="VAICS" className="h-9 lg:hidden" />
+          <div><h1>{title}</h1>{subtitle && <p className="muted mt-1.5">{subtitle}</p>}</div>
           {children}
         </div>
+        <div className="mt-12 flex gap-5 text-[12px] text-slate-400"><Link to="/privacy" className="hover:text-[#0D47A1]">Privacy notice</Link><Link to="/verify" className="hover:text-[#0D47A1]">Verify a document</Link></div>
       </div>
     </div>
   )
@@ -36,22 +40,22 @@ export function Login() {
       const d = await login(f.email, f.password, mfa ? f.totp : '')
       if (d.mfa_required) { setMfa(true); return }
       if (d.mfa_enrolment_required) { setToken(d.access_token); nav('/mfa-enrol'); return }
-      nav(d.password_expired ? '/account?expired=1' : d.user.role === 'platform_admin' ? '/platform' : (q.get('next') || '/'))
+      nav(d.password_expired ? '/account?expired=1' : (q.get('next') || '/'))
     } catch (ex) { setErr(errMsg(ex)) } finally { setBusy(false) }
   }
   return (
-    <AuthCard title="Sign in" subtitle="VAICS Sign">
+    <AuthCard title={mfa ? 'Two-step verification' : 'Welcome back'} subtitle={mfa ? 'Enter the 6-digit code from your authenticator app.' : 'Sign in to VAICS Sign with your work account.'}>
       {q.get('expired') && <Alert kind="warn">Your session ended. Please sign in again.</Alert>}
       <Alert>{err}</Alert>
-      <form onSubmit={submit} className="space-y-3">
+      <form onSubmit={submit} className="space-y-4">
         {!mfa ? <>
           <Field label="Work email"><input className="input" type="email" autoComplete="username" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} required autoFocus /></Field>
           <Field label="Password"><input className="input" type="password" autoComplete="current-password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} required /></Field>
         </> : <Field label="Authentication code (or a recovery code)"><input className="input text-center tracking-[0.3em]" autoComplete="one-time-code" value={f.totp} onChange={(e) => setF({ ...f, totp: e.target.value })} autoFocus /></Field>}
-        <button className="btn-primary w-full" disabled={busy}>{mfa ? 'Verify' : 'Sign in'}</button>
+        <button className="btn-primary h-11 w-full" disabled={busy}>{busy ? 'Please wait…' : mfa ? 'Verify' : 'Sign in'}</button>
       </form>
-      <div className="flex justify-between"><Link className="text-[#0D47A1]" to="/forgot-password">Forgot password?</Link><Link className="text-[#0D47A1]" to="/signup">Create an organization</Link></div>
-      <p className="text-slate-400">Google / Microsoft sign-in and SAML SSO are not enabled in this build.</p>
+      <div className="flex items-center justify-between text-[13px]"><Link className="text-[#0D47A1] hover:underline" to="/forgot-password">Forgot password?</Link><span className="text-slate-400">Access is by invitation</span></div>
+      <p className="border-t border-gray-100 pt-5 text-[12px] text-slate-400">VAICS Portal single sign-on will be connected in a later step.</p>
     </AuthCard>
   )
 }
@@ -71,7 +75,7 @@ export function Signup() {
   return (
     <AuthCard title="Create your organization" subtitle="14-day free trial of the Business plan. No card required.">
       <Alert>{err}</Alert>
-      <form onSubmit={submit} className="space-y-3">
+      <form onSubmit={submit} className="space-y-4">
         <Field label="Your full name"><input className="input" value={f.full_name} onChange={(e) => setF({ ...f, full_name: e.target.value })} required /></Field>
         <Field label="Work email"><input className="input" type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} required /></Field>
         <Field label="Password (12+ characters, mixed case, a number and a symbol)"><input className="input" type="password" autoComplete="new-password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} required /></Field>

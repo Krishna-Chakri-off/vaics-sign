@@ -10,13 +10,15 @@ export function EnvelopeNew() {
   const nav = useNavigate(); const [title, setTitle] = useState('Consulting Agreement'); const [err, setErr] = useState('')
   const create = async (e) => { e.preventDefault(); try { const r = await api.post('/envelopes', { title }); nav(`/envelopes/${r.data.id}`) } catch (ex) { setErr(errMsg(ex)) } }
   return (
-    <PageShell title="New envelope" subtitle="Upload documents, add recipients in order, place fields, then Generate." right={<Link className="btn-secondary" to="/templates">Start from a template</Link>}>
+    <div className="mx-auto max-w-2xl space-y-8 pt-4">
+      <div className="text-center"><div className="eyebrow mb-1">New document</div><h1>What are you sending for signature?</h1><p className="muted mt-2">Give it a name. Next you'll upload the PDF, add signers in order and place their fields.</p></div>
       <Alert>{err}</Alert>
-      <form onSubmit={create} className="card max-w-xl space-y-3">
-        <Field label="Title"><input className="input" value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus /></Field>
-        <button className="btn-accent">Create draft</button>
+      <form onSubmit={create} className="card space-y-5 p-8">
+        <Field label="Document title"><input className="input h-12 !text-[16px]" value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus /></Field>
+        <ol className="grid gap-3 sm:grid-cols-4">{['Upload PDF', 'Add signers', 'Place fields', 'Review & send'].map((x, i) => <li key={x} className="border-t-2 border-[#D6E8FF] pt-2 text-[13px] text-slate-500 first:border-[#0D47A1] first:text-[#0D47A1]"><b className="block text-[12px]">Step {i + 1}</b>{x}</li>)}</ol>
+        <div className="flex items-center justify-between gap-3 border-t border-gray-100 pt-5"><Link className="text-[13px] text-[#0D47A1] hover:underline" to="/templates">or start from a template</Link><button className="btn-primary">Continue</button></div>
       </form>
-    </PageShell>)
+    </div>)
 }
 
 export default function EnvelopeDetail() {

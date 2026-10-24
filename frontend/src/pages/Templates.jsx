@@ -90,7 +90,7 @@ export function Outbox() {
   const [open, setOpen] = useState(null)
   return (
     <PageShell title="Email outbox" subtitle="Every email and SMS the platform generated for your organization.">
-      {data && !data.smtp_configured && <Alert kind="warn">DEV EMAIL OUTBOX — SMTP is not configured, so NO email was delivered. Links and codes below are shown for development and testing only.</Alert>}
+      {data && !data.smtp_configured && <Alert kind="warn"><b>DEV EMAIL OUTBOX — NOT DELIVERED.</b> Email (SMTP / Amazon SES) is not configured, so no message below reached anyone. Links and codes are shown here for testing only.</Alert>}
       {data?.smtp_configured && <Alert kind="ok">SMTP is configured. "Accepted by SMTP" means the relay accepted the message; it does not prove inbox delivery.</Alert>}
       <Alert>{err}</Alert>
       <Table rows={data?.messages || []} onRow={setOpen} cols={[{ label: 'Time', render: (m) => fmt(m.created_at) }, { label: 'Channel', k: 'channel' }, { label: 'To', k: 'to' }, { label: 'Kind', k: 'kind' }, { label: 'Subject', k: 'subject' },

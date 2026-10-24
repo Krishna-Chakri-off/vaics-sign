@@ -125,3 +125,11 @@ def envelope_access(db, p: Principal, env_id: int, write: bool = False) -> Envel
     if any(r.host_user_id == p.user.id for r in env.recipients):
         return env
     raise HTTPException(403, "You do not have access to this envelope")
+
+
+def saas_only():
+    """Phase 1 (internal VAICS) mode: SaaS-only endpoints answer 404 unless SAAS_MODE=true."""
+    from fastapi import HTTPException as _H
+    from ..core.config import settings as _s
+    if not _s.SAAS_MODE:
+        raise _H(404, "Not available in this deployment")

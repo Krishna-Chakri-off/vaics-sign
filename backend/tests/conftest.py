@@ -1,7 +1,7 @@
 import io, os, tempfile
 _tmp = tempfile.mkdtemp(prefix="vaics-test-")
 os.environ.update({"DATABASE_URL": os.environ.get("TEST_DATABASE_URL") or f"sqlite:///{_tmp}/test.db", "STORAGE_DIR": f"{_tmp}/storage", "ENV": "test", "SECRET_KEY": "test-secret-not-for-production",
-                   "RATE_LIMIT_ENABLED": "false", "AUTO_CREATE_TABLES": "true", "SMTP_HOST": "", "HIBP_CHECK": "false", "PUBLIC_APP_URL": "http://app.test"})
+                   "RATE_LIMIT_ENABLED": "false", "AUTO_CREATE_TABLES": "true", "SMTP_HOST": "", "HIBP_CHECK": "false", "PUBLIC_APP_URL": "http://app.test", "SAAS_MODE": "true"})
 import pytest
 from fastapi.testclient import TestClient
 from app.core.db import Base, engine, SessionLocal
@@ -100,6 +100,6 @@ def sign(client, tok, code, name="Signer", reason="Approved"):
     env = client.get(f"/api/v1/public/s/{tok}/envelope", headers=sh)
     assert env.status_code == 200, env.text
     reasons = {f["id"]: reason for f in env.json()["fields"] if f["type"] == "signature"}
-    r = client.post(f"/api/v1/public/s/{tok}/finish", json={"consent": True, "signature": {"kind": "typed", "style": "great_vibes"}, "reasons": reasons}, headers=sh)
+    r = client.post(f"/api/v1/public/s/{tok}/finish", json={"consent": True, "intent": True, "signature_meaning": "Approved", "signature": {"kind": "typed", "style": "great_vibes"}, "reasons": reasons}, headers=sh)
     assert r.status_code == 200, r.text
     return r.json()

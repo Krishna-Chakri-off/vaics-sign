@@ -21,8 +21,12 @@ app.add_middleware(CORSMiddleware, allow_origins=[o.strip() for o in settings.CO
                    expose_headers=["Content-Disposition", "X-RateLimit-Limit", "X-RateLimit-Remaining", "Retry-After"])
 
 v1 = APIRouter(prefix="/api/v1")
-for m in (auth, envelopes, signing, admin, billing, platform, templates, reports, verify, privacy):
+from fastapi import Depends as _Depends
+from .api.deps import saas_only
+for m in (auth, envelopes, signing, admin, templates, reports, verify, privacy):
     v1.include_router(m.router)
+for m in (billing, platform):  # SaaS-only surfaces, 404 unless SAAS_MODE=true
+    v1.include_router(m.router, dependencies=[_Depends(saas_only)])
 app.include_router(v1)
 
 

@@ -128,6 +128,8 @@ def save_progress(tok: str, body: SaveIn, request: Request, x_signer_session: st
 
 class FinishIn(BaseModel):
     consent: bool
+    intent: bool = False  # signer affirmed the signature-meaning statement
+    signature_meaning: str | None = None
     signature: dict = {}
     values: dict[int, str] = {}
     reasons: dict[int, str] = {}

@@ -328,6 +328,8 @@ def complete_recipient(db, org, env, r: Recipient, payload: dict, req, actor_ema
     s = org_settings(org)
     if r.type in SIGNING or r.type == "approver":
         if not payload.get("consent"): raise HTTPException(422, "Accept the electronic record and signature disclosure to continue")
+        if r.type in SIGNING and not payload.get("intent"):
+            raise HTTPException(422, "Confirm the signature statement (meaning of your signature) to continue")
     sig = payload.get("signature") or {}
     my = [f for f in env.fields if f.recipient_id == r.id]
     all_values = {f.id: f.value for f in env.fields if f.value is not None}
@@ -388,6 +390,9 @@ def complete_recipient(db, org, env, r: Recipient, payload: dict, req, actor_ema
     if r.consent_at is None and payload.get("consent"):
         r.consent_at = ts
         audit.record(db, env, "consent_given", r.email, req, "electronic record and signature disclosure accepted", r)
+    if payload.get("intent"):
+        meaning = (payload.get("signature_meaning") or "Approved").strip()[:60]
+        audit.record(db, env, "signature_intent_affirmed", r.email, req, f"signer affirmed intent to sign electronically; meaning: {meaning}", r)
     r.status, r.completed_at = "completed", ts
     r.completed_ip, r.completed_ua = audit.client_ip(req), (req.headers.get("user-agent", "")[:300] if req else None)
     r.token_revoked, r.session_hash = True, None

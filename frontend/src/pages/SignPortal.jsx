@@ -46,7 +46,7 @@ export default function SignPortal() {
   const base = `/public/s/${token}`; const skey = `vs_${token}`
   const [info, setInfo] = useState(null); const [err, setErr] = useState(''); const [code, setCode] = useState(''); const [otpSent, setOtpSent] = useState('')
   const [sess, setSess] = useState(sessionStorage.getItem(skey) || ''); const [env, setEnv] = useState(null); const [bufs, setBufs] = useState({})
-  const [values, setValues] = useState({}); const [reasons, setReasons] = useState({}); const [consent, setConsent] = useState(false); const [sig, setSig] = useState(null)
+  const [values, setValues] = useState({}); const [reasons, setReasons] = useState({}); const [consent, setConsent] = useState(false); const [intent, setIntent] = useState(false); const [meaning, setMeaning] = useState('Approved'); const [sig, setSig] = useState(null)
   const [adopt, setAdopt] = useState(false); const [done, setDone] = useState(''); const [busy, setBusy] = useState(false); const [focus, setFocus] = useState(null); const [declining, setDeclining] = useState(false)
   const [, force] = useState(0); const refs = useRef({})
   const H = { headers: { 'X-Signer-Session': sess } }
@@ -84,7 +84,7 @@ export default function SignPortal() {
   const finish = async () => {
     setErr(''); setBusy(true)
     try {
-      const r = await pub.post(`${base}/finish`, { consent, signature: sig || { kind: 'typed' }, values, reasons }, H)
+      const r = await pub.post(`${base}/finish`, { consent, intent, signature_meaning: meaning, signature: sig || { kind: 'typed' }, values, reasons }, H)
       sessionStorage.removeItem(skey); setDone(r.data.completed ? t('thanksDone') : t('thanksNext'))
     } catch (e) { setErr(errMsg(e)) } finally { setBusy(false) }
   }
@@ -130,17 +130,17 @@ export default function SignPortal() {
       <div className="flex justify-end gap-2">{!kiosk && <select className="input !w-auto" value={getLang()} onChange={(e) => { setLang(e.target.value); force((x) => x + 1) }} aria-label={t('language')}>{LANGS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>}</div>
       {info?.is_sandbox && <Alert kind="warn">SANDBOX envelope — for testing only, not legally binding.</Alert>}
       <Alert>{err}</Alert>
-      {done ? <div className="card space-y-3 text-base font-medium text-green-800"><p>{done}</p>{kiosk && <button className="btn-primary" onClick={() => nav('/envelopes')}>Return the device to the host</button>}</div>
+      {done ? <div className="card mx-auto max-w-lg space-y-4 p-10 text-center"><span className="round mx-auto flex h-14 w-14 items-center justify-center bg-green-50 text-[26px] text-green-700">✓</span><p className="text-[16px] font-medium">{done}</p>{kiosk && <button className="btn-primary" onClick={() => nav('/envelopes')}>Return the device to the host</button>}</div>
         : !sess ? info && (
-          <div className="card mx-auto max-w-md space-y-3">
-            <h1>{info.title}</h1>
-            <p className="text-slate-500">{info.sender} ({info.sender_email}) sent you a document. Hello {info.recipient.name} (step {info.recipient.order}).</p>
+          <div className="card mx-auto max-w-md space-y-5 p-10">
+            <div><div className="eyebrow mb-1">Document for signature</div><h1>{info.title}</h1></div>
+            <p className="muted">{info.sender} ({info.sender_email}) sent you a document. Hello {info.recipient.name} (step {info.recipient.order}).</p>
             {info.recipient.locked ? <Alert>Too many incorrect codes. The sender has been alerted and must reissue your access.</Alert>
               : info.recipient.auth_method === 'none' ? <button className="btn-primary w-full" onClick={openNoCode}>Continue</button>
                 : <form onSubmit={unlock} className="space-y-3">
                   {info.recipient.auth_method === 'access_code' ? <p>{t('enterCode')}</p> : <><button type="button" className="btn-secondary w-full" onClick={sendOtp}>{info.recipient.auth_method === 'sms_otp' ? t('sendSms') : t('sendCode')}</button>{otpSent && <Alert kind="ok">{otpSent}</Alert>}</>}
-                  <input className="input text-center text-xl tracking-[0.4em]" inputMode="numeric" autoComplete="one-time-code" maxLength={8} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} placeholder="••••••" autoFocus aria-label="Code" />
-                  <button className="btn-primary w-full" disabled={busy || code.length < 6}>{t('unlock')}</button>
+                  <input className="input h-14 text-center !text-[24px] tracking-[0.5em]" inputMode="numeric" autoComplete="one-time-code" maxLength={8} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} placeholder="••••••" autoFocus aria-label="Code" />
+                  <button className="btn-primary h-11 w-full" disabled={busy || code.length < 6}>{t('unlock')}</button>
                 </form>}
             <details className="text-slate-500"><summary className="cursor-pointer">Privacy notice</summary><p className="mt-1 whitespace-pre-line">{info.privacy_text}</p></details>
           </div>)
@@ -149,16 +149,19 @@ export default function SignPortal() {
               <div className="flex flex-wrap items-center gap-3">
                 <div className="mr-auto"><h1>{env.title}</h1><p className="text-slate-500">{name} · {env.envelope_id} · {pending.length ? t('fieldsLeft', { n: pending.length }) : '✓'}</p></div>
                 <button className="btn-primary" onClick={goNext}>{pending.length === fields.length ? t('start') : pending.length ? t('next') : t('review')}</button>
-                <button className="btn-accent" disabled={busy || pending.length > 0 || !consent} onClick={finish}>{t('finish')}</button>
+                <button className="btn-accent" disabled={busy || pending.length > 0 || !consent || (env.recipient.type !== 'approver' && env.recipient.type !== 'viewer' && !intent)} onClick={finish}>{t('finish')}</button>
                 <button className="btn-secondary" onClick={saveLater}>{t('later')}</button>
                 <button className="btn-danger" onClick={() => setDeclining(true)}>{t('decline')}</button>
               </div>
               <div className="h-1.5 bg-[#D6E8FF]"><div className="h-full bg-[#E6007E]" style={{ width: `${fields.length ? (100 * (fields.length - pending.length)) / fields.length : 100}%` }} /></div>
               <label className="flex items-start gap-2"><input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} className="mt-0.5" /><span>{t('consent')}. <details className="inline"><summary className="inline cursor-pointer text-[#0D47A1]">Read the disclosure</summary><span className="mt-1 block whitespace-pre-line text-slate-500">{info?.consent_text}</span></details></span></label>
+              {!['approver', 'viewer', 'editor'].includes(env.recipient.type) && <label className="flex flex-wrap items-center gap-2"><input type="checkbox" checked={intent} onChange={(e) => setIntent(e.target.checked)} />
+                <span>I, <b>{name}</b>, intend to sign this document electronically. My signature means:</span>
+                <select className="input !min-h-8 !w-auto !py-1" value={meaning} onChange={(e) => setMeaning(e.target.value)} aria-label="Signature meaning">{['Approved', 'Reviewed', 'Agreed', 'Authored', 'Acknowledged'].map((m) => <option key={m}>{m}</option>)}</select></label>}
               {sig && <div className="flex items-center gap-2 text-slate-500">Adopted signature: {sig.kind} {sig.kind === 'typed' && `(${sig.style})`} <button className="text-[#0D47A1]" onClick={() => setAdopt(true)}>Change</button></div>}
             </div>
             {(env.message || env.private_message) && <div className="card border-l-4 border-l-[#E6007E] whitespace-pre-line">{[env.message, env.private_message].filter(Boolean).join('\n\n')}</div>}
-            <p className="text-slate-500">Click <b>{t('start')}</b> to be guided through each field. Enter a reason under every signature, tick the consent box, then <b>{t('finish')}</b>. Each signature is stamped with your name, reason, IST and UTC time and a SHA-256 hash.</p>
+            <p className="text-slate-500">Click <b>{t('start')}</b> to be guided through each field. Enter a reason under every signature, tick the consent and signature-intent boxes, then <b>{t('finish')}</b>. Each signature is stamped with your name, reason, IST and UTC time and a SHA-256 hash.</p>
             {env.documents.map((d) => <div key={d.id} className="space-y-2">{env.documents.length > 1 && <h2>{d.name}</h2>}{bufs[d.id] ? <PdfPages data={bufs[d.id]} overlay={overlay(d.id)} /> : 'Loading document…'}</div>)}
           </>}
       {adopt && <AdoptModal name={name} initial={sig || {}} allowed={info?.allowed_signature_kinds || ['typed', 'drawn', 'uploaded']} onClose={() => setAdopt(false)} onAdopt={(s) => { setSig(s); setAdopt(false) }} />}

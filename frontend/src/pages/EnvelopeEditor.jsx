@@ -16,7 +16,7 @@ const AUTH = [['access_code', 'Access code (sent separately)'], ['email_otp', 'E
 const SIGTYPE = [['electronic', 'Electronic signature'], ['aadhaar_esign', 'Aadhaar eSign (provider required)'], ['dsc', 'DSC token (provider required)'], ['qes', 'EU QES (provider required)']]
 
 export default function EnvelopeEditor({ env, reload }) {
-  const { user, feature } = useAuth()
+  const { user } = useAuth()
   const [title, setTitle] = useState(env.title); const [message, setMessage] = useState(env.message || '')
   const [rs, setRs] = useState(env.recipients.length ? env.recipients.map((r) => ({ ...r, access_code: '' })) : [
     { name: user.full_name, email: user.email, order: 1, type: 'signer', auth_method: 'access_code', role_name: 'VAICS representative' },
@@ -116,7 +116,7 @@ export default function EnvelopeEditor({ env, reload }) {
           </div>
           <div className="card space-y-2">
             <div className="flex items-center justify-between"><h2>2 · Recipients</h2><span className="text-slate-500">{parallel ? 'Parallel steps in use' : 'Strict order'}</span></div>
-            <p className="text-slate-500">Recipients with the same order number act in parallel{!feature('parallel_routing') && ' (Business plan)'}; lower numbers go first.</p>
+            <p className="text-slate-500">Recipients with the same order number act in parallel; lower numbers go first.</p>
             {rs.map((r, i) => (
               <div key={i} className={`space-y-1 border p-2 ${active === i ? 'border-[#0D47A1] bg-[#F2F8FF]' : 'border-gray-200'}`} onClick={() => setActive(i)}>
                 <div className="flex items-center gap-2">

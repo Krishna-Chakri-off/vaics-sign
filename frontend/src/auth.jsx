@@ -13,7 +13,7 @@ const PERMS = {
   'envelopes.view_all': ['org_admin', 'auditor'], 'audit.view': ['org_admin', 'auditor', 'sender', 'template_manager'],
   'privacy.manage': ['org_admin'], 'reports.view': ['org_admin', 'auditor', 'sender', 'template_manager', 'billing_admin'],
 }
-export const ROLE_LABEL = { org_admin: 'Organization admin', billing_admin: 'Billing admin', sender: 'Sender', template_manager: 'Template manager', auditor: 'Auditor', viewer: 'Viewer', platform_admin: 'VAICS platform admin' }
+export const ROLE_LABEL = { org_admin: 'Administrator', billing_admin: 'Billing admin', sender: 'Sender', template_manager: 'Template manager', auditor: 'Auditor', viewer: 'Viewer', platform_admin: 'VAICS platform admin' }
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
