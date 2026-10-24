@@ -32,7 +32,7 @@ export default function EnvelopeDetail() {
   const open = ['sent', 'delivered', 'partially_signed'].includes(env.status)
   const mine = env.owner?.id === user.id || user.role === 'org_admin'
   const header = (
-    <span>{env.public_id} · sender {env.owner?.name} · <SBadge s={env.status} />{env.is_sandbox && <b className="ml-2 text-[#E6007E]">SANDBOX — not legally binding</b>}{env.legal_hold && <b className="ml-2 text-red-700">LEGAL HOLD</b>}</span>)
+    <span>{env.public_id} · sender {env.owner?.name} · <SBadge s={env.status} />{env.legal_hold && <b className="ml-2 text-red-700">LEGAL HOLD</b>}</span>)
   if (env.status === 'draft') return (
     <PageShell title={env.title} subtitle={header} right={<><Link className="btn-secondary" to="/outbox">Email outbox</Link><button className="btn-danger" onClick={async () => await ask('Delete this draft?') && act(() => api.delete(`/envelopes/${id}`), 'Deleted').then((ok2) => ok2 && nav('/envelopes'))}>Delete draft</button></>}>
       <EnvelopeEditor env={env} reload={load} />

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { pub, errMsg, fmtIST } from '../api'
 import { PublicShell } from '../components/Layout'
-import { Alert, Field, SBadge } from '../components/ui'
+import { Alert, SBadge } from '../components/ui'
 
 export function CompletedAccess() {
   const { token } = useParams(); const base = `/public/completed/${token}`
@@ -24,31 +24,6 @@ export function CompletedAccess() {
           <form onSubmit={dl} className="space-y-2"><input className="input text-center text-xl tracking-[0.4em]" inputMode="numeric" maxLength={8} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} placeholder="••••••" />
             <button className="btn-primary w-full" disabled={code.length < 6}>Download signed PDF</button></form>
         </>}
-      </div>
-    </PublicShell>)
-}
-
-export function PowerFormPublic() {
-  const { slug } = useParams(); const nav = useNavigate()
-  const [info, setInfo] = useState(null); const [err, setErr] = useState(''); const [f, setF] = useState({ name: '', email: '' }); const [vid, setVid] = useState(''); const [code, setCode] = useState(''); const [msg, setMsg] = useState('')
-  useEffect(() => { pub.get(`/public/pf/${slug}`).then((r) => setInfo(r.data)).catch((e) => setErr(errMsg(e))) }, [slug])
-  const start = async (e) => { e.preventDefault(); setErr(''); try { setVid((await pub.post(`/public/pf/${slug}/start`, f)).data.verification_id) } catch (ex) { setErr(errMsg(ex)) } }
-  const verify = async (e) => {
-    e.preventDefault(); setErr('')
-    try { const r = await pub.post(`/public/pf/${slug}/verify`, { verification_id: vid, code }); if (r.data.token) { sessionStorage.setItem(`vs_${r.data.token}`, r.data.session); nav(`/s/${r.data.token}`) } else setMsg(r.data.message) } catch (ex) { setErr(errMsg(ex)) }
-  }
-  return (
-    <PublicShell brand={info?.branding}>
-      <div className="card mx-auto max-w-md space-y-3">
-        <h1>{info?.name || 'Form'}</h1>{info && <p className="text-slate-500">{info.organization} · you will sign as {info.role}</p>}
-        <Alert>{err}</Alert><Alert kind="ok">{msg}</Alert>
-        {info && !vid && <form onSubmit={start} className="space-y-2">
-          <Field label="Full name"><input className="input" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required /></Field>
-          <Field label="Email"><input className="input" type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} required /></Field>
-          <button className="btn-primary w-full">Verify my email</button></form>}
-        {vid && !msg && <form onSubmit={verify} className="space-y-2"><p>Enter the code we emailed to {f.email}.</p>
-          <input className="input text-center text-xl tracking-[0.4em]" inputMode="numeric" maxLength={8} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} />
-          <button className="btn-accent w-full" disabled={code.length < 6}>Continue to sign</button></form>}
       </div>
     </PublicShell>)
 }

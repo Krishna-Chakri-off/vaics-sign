@@ -128,7 +128,6 @@ export default function SignPortal() {
   return (
     <PublicShell brand={brand}>
       <div className="flex justify-end gap-2">{!kiosk && <select className="input !w-auto" value={getLang()} onChange={(e) => { setLang(e.target.value); force((x) => x + 1) }} aria-label={t('language')}>{LANGS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>}</div>
-      {info?.is_sandbox && <Alert kind="warn">SANDBOX envelope — for testing only, not legally binding.</Alert>}
       <Alert>{err}</Alert>
       {done ? <div className="card space-y-3 text-base font-medium text-green-800"><p>{done}</p>{kiosk && <button className="btn-primary" onClick={() => nav('/envelopes')}>Return the device to the host</button>}</div>
         : !sess ? info && (

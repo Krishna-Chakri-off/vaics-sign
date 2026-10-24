@@ -63,17 +63,6 @@ Source of truth: `backend/app/core/config.py` (Settings). `backend/.env.example`
 | `TWILIO_FROM` | `` |  |
 | `MSG91_AUTH_KEY` | `` | secret, set via secret manager |
 | `MSG91_TEMPLATE_ID` | `` |  |
-| `BILLING_PROVIDER_IN` | `razorpay` |  |
-| `BILLING_PROVIDER_INTL` | `stripe` |  |
-| `RAZORPAY_KEY_ID` | `` | secret, set via secret manager |
-| `RAZORPAY_KEY_SECRET` | `` | secret, set via secret manager |
-| `RAZORPAY_WEBHOOK_SECRET` | `` | secret, set via secret manager |
-| `STRIPE_SECRET_KEY` | `` | secret, set via secret manager |
-| `STRIPE_WEBHOOK_SECRET` | `` | secret, set via secret manager |
-| `TRIAL_DAYS` | `14` |  |
-| `TRIAL_PLAN` | `business` |  |
-| `SELLER_GSTIN` | `` |  |
-| `SELLER_STATE_CODE` | `36` |  |
 | `SEAL_CERT_P12_PATH` | `` |  |
 | `SEAL_CERT_P12_PASSWORD` | `` | secret, set via secret manager |
 | `SEAL_TSA_URL` | `` |  |

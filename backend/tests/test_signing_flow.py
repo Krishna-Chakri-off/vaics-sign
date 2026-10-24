@@ -67,8 +67,8 @@ def test_not_your_turn(client):
     assert client.get(f"/api/v1/public/s/{tok1}").status_code == 200
 
 
-def test_parallel_requires_plan_and_works_on_business(client):
-    h = signup(client)  # trial plan = business
+def test_parallel_routing_works(client):
+    h = signup(client)
     rs = [{**R[0], "order": 1, "auth_method": "none"}, {**R[1], "order": 1, "auth_method": "none"}]
     env = draft(client, h, rs)
     assert client.post(f"/api/v1/envelopes/{env['id']}/send", headers=h).status_code == 200
@@ -77,14 +77,6 @@ def test_parallel_requires_plan_and_works_on_business(client):
     sign(client, t2, None)
     t1, _ = link_and_code("ravi@example.com")
     assert sign(client, t1, None)["completed"]
-
-
-def test_parallel_blocked_on_free(client):
-    h = signup(client, plan="free")
-    rs = [{**R[0], "order": 1, "auth_method": "none"}, {**R[1], "order": 1, "auth_method": "none"}]
-    env = draft(client, h, rs)
-    r = client.post(f"/api/v1/envelopes/{env['id']}/send", headers=h)
-    assert r.status_code == 402
 
 
 def test_reason_required(client):

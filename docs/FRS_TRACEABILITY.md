@@ -2,33 +2,35 @@
 
 > Self-assessed by the build agent from code and tests; not independently audited. FR-201..209 and non-functional requirements are tracked in SECURITY.md / ARCHITECTURE.md.
 
+Requirements marked **Removed** belonged to the original multi-tenant SaaS scope and do not apply to the internal VAICS tool.
+
 Honest status per FRS requirement as of this build. Legend: **Done** (implemented and exercised by tests or the E2E run), **Partial** (core path works, listed gaps), **Interface only** (adapter/API exists, refuses with a clear not-configured error, never reports fake success), **Not implemented**.
 
-Summary: Partial: 48, Done: 97, Not implemented: 54, Interface only: 10 (of 209).
+Summary (before the SaaS scope was removed): Partial: 48, Done: 97, Not implemented: 54, Interface only: 10 (of 209).
 
 | FR | Requirement | Priority | Release | Status | Notes |
 |---|---|---|---|---|---|
-| FR-001 | Self-service sign-up | Must | R1 | Partial | Email/password sign-up done; Google/Microsoft return 501 |
+| FR-001 | Self-service sign-up | Must | R1 | Removed | Not applicable: internal single-organisation VAICS tool (no SaaS plans, billing, tenants or public API) |
 | FR-002 | Email verification | Must | R1 | Done |  |
 | FR-003 | Organization creation | Must | R1 | Done |  |
-| FR-004 | Free trial | Must | R1 | Done |  |
-| FR-005 | Trial expiry | Must | R1 | Done |  |
+| FR-004 | Free trial | Must | R1 | Removed | Not applicable: internal single-organisation VAICS tool (no SaaS plans, billing, tenants or public API) |
+| FR-005 | Trial expiry | Must | R1 | Removed | Not applicable: internal single-organisation VAICS tool (no SaaS plans, billing, tenants or public API) |
 | FR-006 | Guided onboarding | Should | R1 | Partial | Sample/first-run hints only; no guided tour |
 | FR-007 | Domain claim | Should | R3 | Not implemented |  |
 | FR-008 | Invite users | Must | R1 | Done |  |
 | FR-009 | Terms and privacy acceptance | Must | R1 | Done |  |
-| FR-010 | Plan catalogue | Must | R1 | Done |  |
+| FR-010 | Plan catalogue | Must | R1 | Removed | Not applicable: internal single-organisation VAICS tool (no SaaS plans, billing, tenants or public API) |
 | FR-011 | Feature entitlements | Must | R1 | Done |  |
-| FR-012 | Online purchase | Must | R1 | Interface only | Checkout/cancel/plan-change APIs exist; returns 503 until a gateway is configured; not live |
-| FR-013 | Payment gateways | Must | R1 | Interface only | Razorpay/Stripe webhook handlers + signature checks; no live gateway tested |
-| FR-014 | Tax invoices | Must | R1 | Partial | GST CGST+SGST/IGST invoices with PDF; EU/UK VAT basic; other sales tax missing |
-| FR-015 | Seats | Must | R1 | Done |  |
-| FR-016 | Usage limits and metering | Must | R1 | Done |  |
-| FR-017 | Overage and top-ups | Should | R2 | Partial | Credits model + purchase API (gateway not live) |
-| FR-018 | Failed payment handling | Must | R1 | Partial | Grace period/restriction in billing job; dunning emails basic |
-| FR-019 | Enterprise contracts | Should | R2 | Partial | Custom plans via platform plans CRUD; PO reference field; no invoice-billing workflow |
-| FR-020 | Billing history | Must | R1 | Done |  |
-| FR-021 | Coupons and partner pricing | Could | R3 | Partial | Coupons done; partner price lists not done |
+| FR-012 | Online purchase | Must | R1 | Removed | Not applicable: internal single-organisation VAICS tool (no SaaS plans, billing, tenants or public API) |
+| FR-013 | Payment gateways | Must | R1 | Removed | Not applicable: internal single-organisation VAICS tool (no SaaS plans, billing, tenants or public API) |
+| FR-014 | Tax invoices | Must | R1 | Removed | Not applicable: internal single-organisation VAICS tool (no SaaS plans, billing, tenants or public API) |
+| FR-015 | Seats | Must | R1 | Removed | Not applicable: internal single-organisation VAICS tool (no SaaS plans, billing, tenants or public API) |
+| FR-016 | Usage limits and metering | Must | R1 | Removed | Not applicable: internal single-organisation VAICS tool (no SaaS plans, billing, tenants or public API) |
+| FR-017 | Overage and top-ups | Should | R2 | Removed | Not applicable: internal single-organisation VAICS tool (no SaaS plans, billing, tenants or public API) |
+| FR-018 | Failed payment handling | Must | R1 | Removed | Not applicable: internal single-organisation VAICS tool (no SaaS plans, billing, tenants or public API) |
+| FR-019 | Enterprise contracts | Should | R2 | Removed | Not applicable: internal single-organisation VAICS tool (no SaaS plans, billing, tenants or public API) |
+| FR-020 | Billing history | Must | R1 | Removed | Not applicable: internal single-organisation VAICS tool (no SaaS plans, billing, tenants or public API) |
+| FR-021 | Coupons and partner pricing | Could | R3 | Removed | Not applicable: internal single-organisation VAICS tool (no SaaS plans, billing, tenants or public API) |
 | FR-022 | Org Admin console | Must | R1 | Done |  |
 | FR-023 | User lifecycle | Must | R1 | Done |  |
 | FR-024 | Groups and teams | Must | R2 | Done | Groups + group sharing of templates |
@@ -36,8 +38,8 @@ Summary: Partial: 48, Done: 97, Not implemented: 54, Interface only: 10 (of 209)
 | FR-026 | Multiple accounts per organization | Should | R4 | Not implemented |  |
 | FR-027 | Organization settings | Must | R1 | Done |  |
 | FR-028 | Admin audit log | Must | R1 | Done |  |
-| FR-029 | Platform Admin console | Must | R1 | Partial | Tenants, plans, health, support-access metadata; feature-flag/provider UI limited |
-| FR-030 | Tenant suspension and closure | Must | R1 | Done |  |
+| FR-029 | Platform Admin console | Must | R1 | Removed | Not applicable: internal single-organisation VAICS tool (no SaaS plans, billing, tenants or public API) |
+| FR-030 | Tenant suspension and closure | Must | R1 | Removed | Not applicable: internal single-organisation VAICS tool (no SaaS plans, billing, tenants or public API) |
 | FR-031 | Password sign-in | Must | R1 | Done |  |
 | FR-032 | Social sign-in | Should | R1 | Not implemented | Returns 501 |
 | FR-033 | Password policy | Must | R1 | Partial | Length/complexity/history; HIBP check optional (off by default); expiry basic |
@@ -146,20 +148,20 @@ Summary: Partial: 48, Done: 97, Not implemented: 54, Interface only: 10 (of 209)
 | FR-136 | Host verification | Must | R2 | Partial | Host ID type/number recorded |
 | FR-137 | Kiosk mode | Should | R2 | Partial | In-person flow hides other envelopes; no hardened kiosk lock |
 | FR-138 | Offline signing | Could | R4 | Not implemented |  |
-| FR-139 | PowerForm creation | Must | R2 | Done |  |
-| FR-140 | Signer details capture | Must | R2 | Done |  |
-| FR-141 | Embedding | Should | R2 | Partial | Public URL; iframe embedding blocked by X-Frame-Options by default |
-| FR-142 | Usage limits and expiry | Must | R2 | Done |  |
+| FR-139 | PowerForm creation | Must | R2 | Removed | Not applicable: internal single-organisation VAICS tool (no SaaS plans, billing, tenants or public API) |
+| FR-140 | Signer details capture | Must | R2 | Removed | Not applicable: PowerForms removed (internal VAICS tool) |
+| FR-141 | Embedding | Should | R2 | Removed | Not applicable: PowerForms removed (internal VAICS tool) |
+| FR-142 | Usage limits and expiry | Must | R2 | Removed | Not applicable: internal single-organisation VAICS tool (no SaaS plans, billing, tenants or public API) |
 | FR-143 | Web forms | Could | R3 | Not implemented |  |
-| FR-144 | Payment fields | Must | R3 | Not implemented |  |
-| FR-145 | Payment gateways for customers | Must | R3 | Not implemented |  |
+| FR-144 | Payment fields | Must | R3 | Removed | Not applicable: internal single-organisation VAICS tool (no SaaS plans, billing, tenants or public API) |
+| FR-145 | Payment gateways for customers | Must | R3 | Removed | Not applicable: internal single-organisation VAICS tool (no SaaS plans, billing, tenants or public API) |
 | FR-146 | Pay at signing | Must | R3 | Not implemented |  |
-| FR-147 | Payment receipts | Must | R3 | Not implemented |  |
+| FR-147 | Payment receipts | Must | R3 | Removed | Not applicable: internal single-organisation VAICS tool (no SaaS plans, billing, tenants or public API) |
 | FR-148 | Bulk send from list | Must | R2 | Done |  |
 | FR-149 | List validation | Must | R2 | Done |  |
 | FR-150 | Bulk job tracking | Must | R2 | Done |  |
 | FR-151 | Bulk actions | Should | R2 | Done |  |
-| FR-152 | Bulk limits | Must | R2 | Done | Plan-based recipient limit |
+| FR-152 | Bulk limits | Must | R2 | Removed | Not applicable: internal single-organisation VAICS tool (no SaaS plans, billing, tenants or public API) |
 | FR-153 | Finalization | Must | R1 | Done |  |
 | FR-154 | Hash chain of versions | Must | R1 | Done |  |
 | FR-155 | Certificate of Completion | Must | R1 | Done |  |
@@ -178,13 +180,13 @@ Summary: Partial: 48, Done: 97, Not implemented: 54, Interface only: 10 (of 209)
 | FR-168 | Search | Must | R1 | Done |  |
 | FR-169 | Standard reports | Must | R2 | Partial | Volume/turnaround/completion/decline reports + CSV |
 | FR-170 | Custom reports and export | Should | R3 | Partial | CSV/XLSX export; no custom builder or scheduling |
-| FR-171 | Usage dashboard | Must | R1 | Done |  |
+| FR-171 | Usage dashboard | Must | R1 | Removed | Not applicable: internal single-organisation VAICS tool (no SaaS plans, billing, tenants or public API) |
 | FR-172 | Public REST API | Must | R2 | Done |  |
-| FR-173 | API authentication | Must | R2 | Partial | API keys (hashed, scoped); OAuth 2.0 not done |
-| FR-174 | Webhooks | Must | R2 | Done |  |
+| FR-173 | API authentication | Must | R2 | Removed | Not applicable: internal single-organisation VAICS tool (no SaaS plans, billing, tenants or public API) |
+| FR-174 | Webhooks | Must | R2 | Removed | Not applicable: internal single-organisation VAICS tool (no SaaS plans, billing, tenants or public API) |
 | FR-175 | Embedded sending and signing | Must | R2 | Not implemented |  |
 | FR-176 | SDKs | Should | R3 | Not implemented |  |
-| FR-177 | Developer sandbox | Must | R2 | Partial | Sandbox plan exists; watermark/no-legal-effect marking basic |
+| FR-177 | Developer sandbox | Must | R2 | Removed | Not applicable: internal single-organisation VAICS tool (no SaaS plans, billing, tenants or public API) |
 | FR-178 | Rate limits | Must | R2 | Partial | Per-process in-memory limiter; not per-plan, not shared across workers |
 | FR-179 | Idempotency | Should | R2 | Done | Idempotency-Key on create |
 | FR-180 | Google Drive | Must | R2 | Not implemented |  |
@@ -206,7 +208,7 @@ Summary: Partial: 48, Done: 97, Not implemented: 54, Interface only: 10 (of 209)
 | FR-196 | Translated notifications | Must | R2 | Not implemented |  |
 | FR-197 | Unicode documents | Must | R1 | Partial | Unicode stored; Indic shaping in stamped PDFs not supported |
 | FR-198 | Regional data centres | Must | R1 | Not implemented |  |
-| FR-199 | Region selection | Must | R1 | Partial | Region chosen at sign-up and routes S3 bucket by region; single deployment |
+| FR-199 | Region selection | Must | R1 | Removed | Not applicable: internal single-organisation VAICS tool (no SaaS plans, billing, tenants or public API) |
 | FR-200 | Region migration | Should | R4 | Not implemented |  |
 | FR-201 | Sub-processor transparency | Must | R1 | Not implemented |  |
 | FR-202 | Retention policies | Must | R1 | Not implemented |  |
@@ -216,4 +218,4 @@ Summary: Partial: 48, Done: 97, Not implemented: 54, Interface only: 10 (of 209)
 | FR-206 | Data-subject requests | Must | R1 | Not implemented |  |
 | FR-207 | Privacy notice to recipients | Must | R1 | Not implemented |  |
 | FR-208 | Organization data export | Must | R2 | Not implemented |  |
-| FR-209 | Tenant closure | Must | R1 | Not implemented |  |
+| FR-209 | Tenant closure | Must | R1 | Removed | Not applicable: internal single-organisation VAICS tool (no SaaS plans, billing, tenants or public API) |

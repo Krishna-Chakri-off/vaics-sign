@@ -9,7 +9,6 @@ class Settings(BaseSettings):
     # --- core ---
     ENV: str = "development"  # development | test | production
     APP_NAME: str = "VAICS Sign"
-    SAAS_MODE: bool = False  # Phase 1 = internal VAICS-only: public sign-up, billing and platform console are disabled
     DATABASE_URL: str = "sqlite:///./vaics_sign.db"
     SECRET_KEY: str = "dev-only-change-me"
     PUBLIC_APP_URL: str = "http://localhost:5175"  # frontend base URL used in emails
@@ -81,19 +80,6 @@ class Settings(BaseSettings):
     TWILIO_FROM: str = ""
     MSG91_AUTH_KEY: str = ""
     MSG91_TEMPLATE_ID: str = ""
-
-    # --- billing ---
-    BILLING_PROVIDER_IN: str = "razorpay"
-    BILLING_PROVIDER_INTL: str = "stripe"
-    RAZORPAY_KEY_ID: str = ""
-    RAZORPAY_KEY_SECRET: str = ""
-    RAZORPAY_WEBHOOK_SECRET: str = ""
-    STRIPE_SECRET_KEY: str = ""
-    STRIPE_WEBHOOK_SECRET: str = ""
-    TRIAL_DAYS: int = 14
-    TRIAL_PLAN: str = "business"
-    SELLER_GSTIN: str = ""
-    SELLER_STATE_CODE: str = "36"  # Telangana
 
     # --- trust providers ---
     SEAL_CERT_P12_PATH: str = ""  # PKCS#12 document-signing certificate for PAdES seal

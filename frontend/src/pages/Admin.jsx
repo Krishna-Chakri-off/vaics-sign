@@ -1,14 +1,13 @@
 import { useState } from 'react'
 import api, { errMsg, fmt, download } from '../api'
 import { useAuth, ROLE_LABEL } from '../auth'
-import { PageShell, Table, Alert, Modal, Field, SBadge, Section, Tabs, useAsync , ask } from '../components/ui'
+import { PageShell, Table, Alert, Modal, Field, SBadge, Section, useAsync , ask } from '../components/ui'
 
 const ROLES = ['org_admin', 'sender', 'template_manager', 'auditor', 'viewer']
-const SCOPES = ['envelopes:read', 'envelopes:write', 'templates:read', 'templates:write', 'bulk:write', 'powerforms:write', 'users:read', 'reports:read', 'audit:read', 'webhooks:write']
 const useMsg = () => { const [m, setM] = useState({ ok: '', err: '' }); const run = async (fn, ok) => { setM({ ok: '', err: '' }); try { const r = await fn(); setM({ ok: typeof ok === 'function' ? ok(r.data) : ok || 'Saved', err: '' }); return r } catch (e) { setM({ ok: '', err: errMsg(e) }) } }; return [m, run] }
 
 export function UsersGroups() {
-  const { user, feature } = useAuth()
+  const { user } = useAuth()
   const users = useAsync(() => api.get('/org/users').then((r) => r.data))
   const invites = useAsync(() => api.get('/org/invitations').then((r) => r.data))
   const groups = useAsync(() => api.get('/org/groups').then((r) => r.data))
@@ -33,7 +32,7 @@ export function UsersGroups() {
       <h2>Pending invitations</h2>
       <Table rows={(invites.data || []).filter((i) => i.status === 'pending')} empty="No pending invitations." cols={[{ label: 'Email', k: 'email' }, { label: 'Role', render: (i) => ROLE_LABEL[i.role] }, { label: 'Expires', render: (i) => fmt(i.expires_at) },
         { label: '', render: (i) => <div className="flex gap-1"><button className="btn-secondary" onClick={() => run(() => api.post(`/org/invitations/${i.id}/resend`), 'Invitation resent')}>Resend</button><button className="btn-danger" onClick={() => run(() => api.delete(`/org/invitations/${i.id}`), 'Revoked').then(reload)}>Revoke</button></div> }]} />
-      <div className="flex items-center justify-between"><h2>Groups</h2>{feature('groups') ? <button className="btn-secondary" onClick={() => setGrp({ name: '', member_ids: [] })}>+ New group</button> : null}</div>
+      <div className="flex items-center justify-between"><h2>Groups</h2>{<button className="btn-secondary" onClick={() => setGrp({ name: '', member_ids: [] })}>+ New group</button>}</div>
       <Table rows={groups.data || []} onRow={setGrp} empty="No groups." cols={[{ label: 'Group', k: 'name' }, { label: 'Members', render: (g) => g.member_ids.map((id) => (users.data || []).find((u) => u.id === id)?.full_name).filter(Boolean).join(', ') }]} />
       {grp && <Modal title={grp.id ? 'Edit group' : 'New group'} onClose={() => setGrp(null)} footer={<>{grp.id && <button className="btn-danger mr-auto" onClick={() => run(() => api.delete(`/org/groups/${grp.id}`), 'Group deleted').then(() => { setGrp(null); reload() })}>Delete</button>}
         <button className="btn-primary" onClick={() => run(() => (grp.id ? api.put(`/org/groups/${grp.id}`, grp) : api.post('/org/groups', grp)), 'Group saved').then(() => { setGrp(null); reload() })}>Save</button></>}>
@@ -44,7 +43,7 @@ export function UsersGroups() {
 }
 
 export function SettingsBranding() {
-  const { feature, refresh } = useAuth()
+  const { refresh } = useAuth()
   const { data, reload } = useAsync(() => api.get('/org/settings').then((r) => r.data))
   const [m, run] = useMsg(); const [s, setS] = useState(null); const [b, setB] = useState(null); const [o, setO] = useState(null)
   if (!data) return 'Loading…'
@@ -99,37 +98,9 @@ export function SettingsBranding() {
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <img src={B.logo_url || '/vaics-logo-full.png'} alt="logo" className="h-10 border bg-white p-1" />
           <label className="btn-secondary cursor-pointer">Upload logo (PNG/JPEG, ≤512 KB)<input hidden type="file" accept="image/png,image/jpeg" onChange={async (e) => { const fd = new FormData(); fd.append('file', e.target.files[0]); await run(() => api.post('/org/branding/logo', fd), 'Logo updated'); reload() }} /></label>
-          <button className="btn-primary" disabled={!feature('branding')} onClick={() => run(() => api.put('/org/branding', { product_name: B.product_name, primary: B.primary, accent: B.accent, email_footer: B.email_footer, reply_to: B.reply_to || null }), 'Branding saved').then(() => { setB(null); reload() })}>Save branding</button>
+          <button className="btn-primary" onClick={() => run(() => api.put('/org/branding', { product_name: B.product_name, primary: B.primary, accent: B.accent, email_footer: B.email_footer, reply_to: B.reply_to || null }), 'Branding saved').then(() => { setB(null); reload() })}>Save branding</button>
           <div className="flex items-center gap-2 border px-3 py-2" style={{ background: B.primary }}><span className="font-semibold text-white">{B.product_name}</span><span className="px-2 py-1 text-white" style={{ background: B.accent }}>Button</span></div>
         </div>
-      </Section>
-    </PageShell>)
-}
-
-export function Integrations() {
-  const { feature } = useAuth()
-  const keys = useAsync(() => api.get('/org/api-keys').then((r) => r.data)); const hooks = useAsync(() => api.get('/org/webhooks').then((r) => r.data)); const dels = useAsync(() => api.get('/org/webhooks/deliveries').then((r) => r.data))
-  const [m, run] = useMsg(); const [k, setK] = useState({ name: '', scopes: ['envelopes:read'] }); const [secret, setSecret] = useState(null); const [h, setH] = useState({ url: '', events: '*' })
-  return (
-    <PageShell title="API & webhooks" subtitle={<>REST API at <code>/api/v1</code> · OpenAPI docs at <a className="text-[#0D47A1]" href="/api/docs" target="_blank" rel="noreferrer">/api/docs</a></>}>
-      {!feature('api') && <Alert kind="warn">API access and webhooks need the Business plan (or the developer sandbox).</Alert>}
-      <Alert>{m.err}</Alert><Alert kind="ok">{m.ok}</Alert>
-      {secret && <Alert kind="warn">Copy now — shown only once: <code className="break-all">{secret}</code></Alert>}
-      <Section title="API keys">
-        <div className="flex flex-wrap items-end gap-2"><Field label="Key name"><input className="input" value={k.name} onChange={(e) => setK({ ...k, name: e.target.value })} /></Field>
-          <div className="flex flex-wrap gap-2">{SCOPES.map((s) => <label key={s} className="inline-flex gap-1"><input type="checkbox" checked={k.scopes.includes(s)} onChange={(e) => setK({ ...k, scopes: e.target.checked ? [...k.scopes, s] : k.scopes.filter((x) => x !== s) })} />{s}</label>)}</div>
-          <button className="btn-accent" onClick={async () => { const r = await run(() => api.post('/org/api-keys', k), 'API key created'); if (r) { setSecret(r.data.key); keys.reload() } }}>Create key</button></div>
-        <Table rows={keys.data || []} cols={[{ label: 'Name', k: 'name' }, { label: 'Prefix', render: (x) => <code>{x.prefix}…</code> }, { label: 'Scopes', render: (x) => x.scopes.join(', ') }, { label: 'Last used', render: (x) => fmt(x.last_used_at) },
-          { label: '', render: (x) => x.revoked ? 'Revoked' : <button className="btn-danger" onClick={() => run(() => api.delete(`/org/api-keys/${x.id}`), 'Revoked').then(keys.reload)}>Revoke</button> }]} />
-      </Section>
-      <Section title="Webhooks">
-        <p className="text-slate-500">Each delivery is signed: <code>X-VAICS-Signature: t=&lt;unix&gt;,v1=HMAC_SHA256(secret, "&lt;t&gt;.&lt;body&gt;")</code>. Failed deliveries retry after 1, 5, 30, 120 and 720 minutes.</p>
-        <div className="flex flex-wrap items-end gap-2"><Field label="HTTPS URL" className="min-w-72 flex-1"><input className="input" value={h.url} onChange={(e) => setH({ ...h, url: e.target.value })} /></Field>
-          <Field label="Events (comma separated, * = all)"><input className="input" value={h.events} onChange={(e) => setH({ ...h, events: e.target.value })} /></Field>
-          <button className="btn-accent" onClick={async () => { const r = await run(() => api.post('/org/webhooks', { url: h.url, events: h.events.split(',').map((s) => s.trim()).filter(Boolean) }), 'Webhook added'); if (r) { setSecret(r.data.secret); hooks.reload() } }}>Add webhook</button></div>
-        <Table rows={hooks.data || []} cols={[{ label: 'URL', k: 'url' }, { label: 'Events', render: (w) => w.events.join(', ') }, { label: 'Active', render: (w) => (w.active ? 'Yes' : 'No') }, { label: '', render: (w) => w.active && <button className="btn-danger" onClick={() => run(() => api.delete(`/org/webhooks/${w.id}`), 'Disabled').then(hooks.reload)}>Disable</button> }]} />
-        <h3 className="mt-3">Recent deliveries</h3>
-        <Table rows={dels.data || []} cols={[{ label: 'Time', render: (d) => fmt(d.created_at) }, { label: 'Event', k: 'event' }, { label: 'Status', render: (d) => <SBadge s={d.status === 'delivered' ? 'delivered_wh' : d.status} /> }, { label: 'Attempts', k: 'attempts' }, { label: 'HTTP', k: 'response_code' }, { label: 'Error', k: 'error' }]} />
       </Section>
     </PageShell>)
 }
@@ -175,42 +146,3 @@ export function Privacy() {
     </PageShell>)
 }
 
-export function Billing() {
-  const { refresh } = useAuth()
-  const sub = useAsync(() => api.get('/billing/subscription').then((r) => r.data)); const plans = useAsync(() => api.get('/billing/plans').then((r) => r.data)); const inv = useAsync(() => api.get('/billing/invoices').then((r) => r.data))
-  const [m, run] = useMsg(); const [cycle, setCycle] = useState('monthly'); const [seats, setSeats] = useState(null); const [coupon, setCoupon] = useState(''); const [tab, setTab] = useState('plan')
-  const S = sub.data; if (!S || !plans.data) return 'Loading…'
-  const cur = S.currency; const seatN = seats ?? S.seats
-  const checkout = async (code) => {
-    const r = await run(() => api.post('/billing/checkout', { plan: code, cycle, seats: seatN, coupon: coupon || null }), (d) => d.paid ? 'Plan changed.' : 'Checkout created.')
-    if (r?.data?.checkout?.checkout_url) location.href = r.data.checkout.checkout_url
-    else if (r?.data?.checkout?.order_id) run(async () => ({ data: null }), `Razorpay order ${r.data.checkout.order_id} created. Complete payment with Razorpay Checkout (key ${r.data.checkout.key_id}).`)
-    sub.reload(); inv.reload(); refresh()
-  }
-  return (
-    <PageShell title="Plan & billing" subtitle={`Current: ${S.plan?.name || '—'} · ${S.status}${S.trial_ends_at ? ` · trial ends ${fmt(S.trial_ends_at)}` : ''} · ${S.seats} seat(s)`}>
-      {!S.provider_configured && <Alert kind="warn">Online payments are not live: the {S.provider} payment provider is not configured in this deployment. Checkout returns an error and nothing is charged. VAICS can assign plans on invoice terms.</Alert>}
-      <Alert>{m.err}</Alert><Alert kind="ok">{m.ok}</Alert>
-      <Tabs value={tab} onChange={setTab} tabs={[['plan', 'Plans'], ['usage', 'Usage'], ['invoices', 'Invoices']]} />
-      {tab === 'plan' && <>
-        <div className="flex flex-wrap items-end gap-2"><Field label="Billing cycle"><select className="input" value={cycle} onChange={(e) => setCycle(e.target.value)}><option value="monthly">Monthly</option><option value="annual">Annual (2 months free)</option></select></Field>
-          <Field label="Seats"><input className="input !w-24" type="number" min={1} value={seatN} onChange={(e) => setSeats(+e.target.value)} /></Field>
-          <Field label="Coupon"><input className="input" value={coupon} onChange={(e) => setCoupon(e.target.value)} /></Field>
-          {seats != null && seats !== S.seats && S.status === 'active' && <button className="btn-secondary" onClick={() => run(() => api.post('/billing/seats', { seats }), (d) => d.note || 'Seats updated').then(() => { setSeats(null); sub.reload() })}>Change seats only</button>}</div>
-        <div className="grid gap-3 md:grid-cols-3">{plans.data.map((p) => <div key={p.code} className={`card space-y-2 ${S.plan?.code === p.code ? 'border-[#E6007E]' : ''}`}>
-          <h2>{p.name}</h2><p className="text-slate-500">{p.description}</p>
-          <div className="text-[22px] font-semibold text-[#0D47A1]">{cur} {p.prices?.[cur]?.[cycle] ?? '—'}<span className="text-[12px] font-normal text-slate-500"> / seat / {cycle === 'annual' ? 'year' : 'month'} + tax</span></div>
-          <ul className="text-slate-600">{[['envelopes_per_month', 'envelopes / month'], ['templates', 'templates'], ['sms_per_month', 'SMS / month'], ['api_calls_per_month', 'API calls / month']].map(([k, l]) => <li key={k}>• {p.limits[k] === -1 ? 'Unlimited' : p.limits[k] ?? 0} {l}</li>)}
-            {Object.entries(p.features).filter(([, v]) => v).map(([f]) => <li key={f}>✓ {f.replaceAll('_', ' ')}</li>)}</ul>
-          {S.plan?.code === p.code && S.status === 'active' ? <SBadge s="active" label="Current plan" /> : <button className="btn-accent w-full" onClick={() => checkout(p.code)}>{p.code === 'free' ? 'Switch to Free' : 'Choose'}</button>}
-        </div>)}</div>
-        <div className="flex gap-2"><button className="btn-secondary" onClick={async () => await ask('Downgrade to Free at once? Paid features stop working.') && run(() => api.post('/billing/cancel'), (d) => d.note).then(() => { sub.reload(); refresh() })}>Cancel subscription</button>
-          <button className="btn-secondary" onClick={async () => { const metric = prompt('Buy credits for (envelopes / sms / aadhaar / dsc / idv):', 'envelopes'); const qty = +prompt('Quantity', '100'); if (metric && qty) run(() => api.post('/billing/credits', { metric, quantity: qty }), 'Credit checkout created') }}>Buy credits</button></div>
-        <p className="text-slate-500">Enterprise plans with custom limits, invoice billing and PO numbers are arranged with VAICS sales.</p>
-      </>}
-      {tab === 'usage' && <Table rows={Object.entries(S.usage).map(([k, v]) => ({ id: k, k, ...v }))} cols={[{ label: 'Metric', k: 'k' }, { label: 'Used', k: 'used' }, { label: 'Limit', render: (r) => r.limit ?? 'Unlimited' }, { label: 'Credits', render: (r) => r.credits ?? '—' }, { label: '%', render: (r) => (r.pct != null ? `${r.pct}%` : '—') }]} />}
-      {tab === 'invoices' && <Table rows={inv.data || []} empty="No invoices." cols={[{ label: 'Number', k: 'number' }, { label: 'Date', render: (i) => fmt(i.created_at) }, { label: 'Status', render: (i) => <SBadge s={i.status} /> },
-        { label: 'Total', render: (i) => `${i.currency} ${(i.total / 100).toFixed(2)}` }, { label: 'Tax', render: (i) => `${i.tax?.type || ''} ${((i.tax?.amount || 0) / 100).toFixed(2)}` },
-        { label: '', render: (i) => <button className="btn-secondary" onClick={() => download(`/billing/invoices/${i.id}/pdf`, `${i.number}.pdf`)}>PDF</button> }]} />}
-    </PageShell>)
-}

@@ -35,7 +35,7 @@ export default function Envelopes() {
       <Table rows={data.items} onRow={(e) => nav(`/envelopes/${e.id}`)} empty="No envelopes match these filters."
         cols={[
           { label: '', render: (e) => <input type="checkbox" checked={sel.includes(e.id)} onClick={(ev) => ev.stopPropagation()} onChange={(ev) => setSel(ev.target.checked ? [...sel, e.id] : sel.filter((x) => x !== e.id))} /> },
-          { label: 'Title', render: (e) => <div><div className="font-medium">{e.title}</div><div className="text-slate-400">{e.public_id}{e.is_sandbox ? ' · sandbox' : ''}{e.labels?.length ? ` · ${e.labels.join(', ')}` : ''}</div></div> },
+          { label: 'Title', render: (e) => <div><div className="font-medium">{e.title}</div><div className="text-slate-400">{e.public_id}{e.labels?.length ? ` · ${e.labels.join(', ')}` : ''}</div></div> },
           { label: 'Status', render: (e) => <SBadge s={e.status} /> },
           { label: 'Recipients', render: (e) => e.recipients.map((r) => <div key={r.id} className={r.current ? 'font-semibold text-[#0D47A1]' : ''}>{r.order}. {r.name} <span className="text-slate-400">({r.status})</span></div>) },
           { label: 'Sender', render: (e) => e.owner?.name },

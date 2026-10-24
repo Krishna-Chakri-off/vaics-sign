@@ -1,20 +1,19 @@
 import io, os, tempfile
 _tmp = tempfile.mkdtemp(prefix="vaics-test-")
 os.environ.update({"DATABASE_URL": os.environ.get("TEST_DATABASE_URL") or f"sqlite:///{_tmp}/test.db", "STORAGE_DIR": f"{_tmp}/storage", "ENV": "test", "SECRET_KEY": "test-secret-not-for-production",
-                   "RATE_LIMIT_ENABLED": "false", "AUTO_CREATE_TABLES": "true", "SMTP_HOST": "", "HIBP_CHECK": "false", "PUBLIC_APP_URL": "http://app.test", "SAAS_MODE": "true"})
+                   "RATE_LIMIT_ENABLED": "false", "AUTO_CREATE_TABLES": "true", "SMTP_HOST": "", "HIBP_CHECK": "false", "PUBLIC_APP_URL": "http://app.test"})
 import pytest
 from fastapi.testclient import TestClient
 from app.core.db import Base, engine, SessionLocal
 from app import models
 from app.main import app
-from app.seed import ensure_plans
 
 PW = "Correct-Horse-9-Battery"
 
 
 @pytest.fixture(autouse=True)
 def fresh_db():
-    Base.metadata.drop_all(bind=engine); Base.metadata.create_all(bind=engine); ensure_plans()
+    Base.metadata.drop_all(bind=engine); Base.metadata.create_all(bind=engine)
     from app.core.middleware import limiter
     limiter.hits.clear() if hasattr(limiter, "hits") else None
     yield
@@ -52,15 +51,16 @@ def make_pdf(pages=1, rotate=0) -> bytes:
     o = io.BytesIO(); w.write(o); return o.getvalue()
 
 
-def signup(client, email="krishna@example.com", org="VAICS Consulting", country="IN", verify=True, plan=None):
-    r = client.post("/api/v1/auth/signup", json={"full_name": "Krishna", "email": email, "password": PW, "organization": org, "country": country, "accept_terms": True})
-    assert r.status_code == 201, r.text
-    if verify:
-        link = outbox("verify_email", email)[-1].link
-        assert client.post(f"/api/v1/auth/verify-email/{link.rsplit('/', 1)[1]}").status_code == 200
-    if plan:
-        with SessionLocal() as s:
-            o = s.get(models.Organization, r.json()["org_id"]); o.plan_id = s.query(models.Plan).filter_by(code=plan).first().id; o.status = "active"; s.commit()
+def signup(client, email="krishna@example.com", org="VAICS Consulting", country="IN", verify=True):
+    """Create the VAICS organisation and an administrator directly (there is no self-service sign-up), then sign in."""
+    from app.core.security import hash_password
+    with SessionLocal() as s:
+        o = s.query(models.Organization).filter_by(name=org).first()
+        if not o:
+            o = models.Organization(name=org, slug=org.lower().replace(" ", "-"), country=country, region="in", status="active", currency="INR", settings={}, branding={})
+            s.add(o); s.flush()
+        s.add(models.User(org_id=o.id, email=email, full_name="Krishna", role="org_admin", password_hash=hash_password(PW), email_verified=verify, password_changed_at=models.now()))
+        s.commit()
     return login(client, email)
 
 

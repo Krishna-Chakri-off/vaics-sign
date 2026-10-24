@@ -5,14 +5,13 @@ import { useAuth } from '../auth'
 import { PageShell, Table, Alert, Modal, Field, SBadge, useAsync , ask } from '../components/ui'
 
 export default function Templates() {
-  const nav = useNavigate(); const { can, feature } = useAuth()
+  const nav = useNavigate(); const { can } = useAuth()
   const [q, setQ] = useState(''); const [fav, setFav] = useState(false)
   const { data, err, reload } = useAsync(() => api.get('/templates', { params: { q, favourites: fav } }).then((r) => r.data), [q, fav])
   const [use, setUse] = useState(null); const [msg, setMsg] = useState(''); const [e2, setE2] = useState('')
   const share = async (t, sharing) => { try { await api.put(`/templates/${t.id}`, { sharing }); reload() } catch (e) { setE2(errMsg(e)) } }
   return (
     <PageShell title="Templates" subtitle="Reusable documents, roles, fields and messages. Save any envelope as a template from its page.">
-      {!feature('templates') && <Alert kind="warn">Templates are not included in your plan. Upgrade in Plan & billing.</Alert>}
       <div className="flex gap-2"><input className="input max-w-sm" placeholder="Search templates" onKeyDown={(e) => e.key === 'Enter' && setQ(e.target.value)} /><label className="flex items-center gap-1"><input type="checkbox" checked={fav} onChange={(e) => setFav(e.target.checked)} /> Favourites</label></div>
       <Alert>{err || e2}</Alert><Alert kind="ok">{msg}</Alert>
       <Table rows={data || []} empty="No templates yet." cols={[
@@ -24,7 +23,6 @@ export default function Templates() {
         { label: 'Updated', render: (t) => fmt(t.updated_at) },
         { label: '', render: (t) => <div className="flex gap-1"><button className="btn-accent" onClick={() => setUse(t)}>Use</button>
           {can('bulk.send') && <button className="btn-secondary" onClick={() => nav(`/bulk?template=${t.id}`)}>Bulk</button>}
-          {can('templates.share') && <button className="btn-secondary" onClick={async () => { const name = prompt('PowerForm name', t.name); if (!name) return; try { const r = await api.post('/powerforms', { template_id: t.id, name }); setMsg(`PowerForm created: ${r.data.url}`) } catch (e) { setE2(errMsg(e)) } }}>PowerForm</button>}
           {can('templates.share') && <button className="btn-secondary" onClick={async () => { if (await ask('Archive this template?')) { await api.put(`/templates/${t.id}`, { archived: true }); reload() } }}>Archive</button>}</div> },
       ]} />
       {use && <UseModal t={use} onClose={() => setUse(null)} onDone={(env) => nav(`/envelopes/${env.id}`)} />}
@@ -72,24 +70,11 @@ export function Bulk() {
     </PageShell>)
 }
 
-export function PowerForms() {
-  const { can } = useAuth()
-  const { data, err, reload } = useAsync(() => api.get('/powerforms').then((r) => r.data))
-  return (
-    <PageShell title="PowerForms" subtitle="Self-service signing links built from a template. The signer verifies their email before signing. Create one from Templates.">
-      <Alert>{err}</Alert>
-      <Table rows={data || []} empty="No PowerForms yet." cols={[{ label: 'Name', k: 'name' }, { label: 'Link', render: (f) => <a className="break-all text-[#0D47A1]" href={f.url} target="_blank" rel="noreferrer">{f.url}</a> },
-        { label: 'Uses', render: (f) => `${f.uses}${f.max_uses ? ` / ${f.max_uses}` : ''}` }, { label: 'Status', render: (f) => <SBadge s={f.enabled ? 'active' : 'closed'} label={f.enabled ? 'Enabled' : 'Disabled'} /> },
-        { label: 'Embed', render: (f) => <button className="btn-secondary" onClick={() => navigator.clipboard?.writeText(f.embed_html)}>Copy iframe</button> },
-        { label: '', render: (f) => can('templates.share') && <button className="btn-secondary" onClick={async () => { await api.patch(`/powerforms/${f.id}`, { enabled: !f.enabled }); reload() }}>{f.enabled ? 'Disable' : 'Enable'}</button> }]} />
-    </PageShell>)
-}
-
 export function Outbox() {
   const { data, err } = useAsync(() => api.get('/org/outbox').then((r) => r.data))
   const [open, setOpen] = useState(null)
   return (
-    <PageShell title="Email outbox" subtitle="Every email and SMS the platform generated for your organization.">
+    <PageShell title="Email outbox" subtitle="Every email and SMS VAICS Sign generated for your organization.">
       {data && !data.smtp_configured && <Alert kind="warn"><b>DEV EMAIL OUTBOX — NOT DELIVERED.</b> Email (SMTP / Amazon SES) is not configured, so no message below reached anyone. Links and codes are shown here for testing only.</Alert>}
       {data?.smtp_configured && <Alert kind="ok">SMTP is configured. "Accepted by SMTP" means the relay accepted the message; it does not prove inbox delivery.</Alert>}
       <Alert>{err}</Alert>
@@ -110,7 +95,7 @@ export function Reports() {
   const { data, err } = useAsync(() => api.get('/reports/summary', { params: { days, group_by: by } }).then((r) => r.data), [days, by])
   const T = data?.total
   return (
-    <PageShell title="Reports" subtitle="Volume, completion and turnaround. Sandbox envelopes are excluded." right={<button className="btn-secondary" onClick={() => download(`/reports/summary.csv?days=${days}&group_by=${by}`, 'vaics-sign-report.csv')}>Export CSV</button>}>
+    <PageShell title="Reports" subtitle="Volume, completion and turnaround." right={<button className="btn-secondary" onClick={() => download(`/reports/summary.csv?days=${days}&group_by=${by}`, 'vaics-sign-report.csv')}>Export CSV</button>}>
       <div className="flex gap-2"><select className="input !w-auto" value={days} onChange={(e) => setDays(+e.target.value)}>{[7, 30, 90, 365].map((d) => <option key={d} value={d}>Last {d} days</option>)}</select>
         <select className="input !w-auto" value={by} onChange={(e) => setBy(e.target.value)}><option value="period">By period</option><option value="user">By sender</option><option value="template">By template</option></select></div>
       <Alert>{err}</Alert>

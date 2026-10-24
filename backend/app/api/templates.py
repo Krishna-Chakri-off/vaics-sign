@@ -1,4 +1,4 @@
-"""Templates (FR-059..065), envelope-from-template, bulk send (FR-148..152) and PowerForms (FR-139..142)."""
+"""Templates (FR-059..065), envelope-from-template, bulk send (FR-148..152)."""
 import csv, io, json, re, secrets
 from datetime import datetime, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File, Form
@@ -8,13 +8,13 @@ from sqlalchemy.orm import Session
 from ..core.config import settings
 from ..core.db import get_db
 from ..core.security import sha256_hex, random_token, numeric_code, keyed_hash
-from ..models import Template, TemplateVersion, Envelope, EnvelopeDocument, Recipient, Field, BulkJob, PowerForm, Organization, User, OneTimeToken, FIELD_TYPES, now
-from ..services import workflow as wf, audit, usage, notify
+from ..models import Template, TemplateVersion, Envelope, EnvelopeDocument, Recipient, Field, BulkJob, Organization, User, OneTimeToken, FIELD_TYPES, now
+from ..services import workflow as wf, audit, notify
 from ..services.storage import storage
-from .deps import Principal, perm, org_member, scope, envelope_access, user_groups
+from .deps import Principal, perm, org_member, envelope_access, user_groups
 from .serializers import envelope_out
 
-router = APIRouter(tags=["templates, bulk send, powerforms"])
+router = APIRouter(tags=["templates & bulk send"])
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
@@ -40,7 +40,7 @@ def tpl_access(db, p, tid, write=False) -> Template:
 
 
 @router.get("/templates")
-def list_templates(q: str | None = None, favourites: bool = False, p: Principal = Depends(scope("templates:read")), db: Session = Depends(get_db)):
+def list_templates(q: str | None = None, favourites: bool = False, p: Principal = Depends(org_member), db: Session = Depends(get_db)):
     rows = visible_templates(db, p).order_by(Template.updated_at.desc()).all()
     if q: rows = [t for t in rows if q.lower() in (t.name + " " + t.description).lower()]
     if favourites: rows = [t for t in rows if p.user.id in (t.favourite_of or [])]
@@ -56,13 +56,9 @@ class FromEnvelopeIn(BaseModel):
 
 
 @router.post("/templates", status_code=201)
-def create_template(body: FromEnvelopeIn, request: Request, p: Principal = Depends(perm("templates.create", "templates:write")), db: Session = Depends(get_db)):
+def create_template(body: FromEnvelopeIn, request: Request, p: Principal = Depends(perm("templates.create")), db: Session = Depends(get_db)):
     """Save an envelope (draft or sent) as a template: documents, roles (from recipients), fields, routing and message."""
-    usage.require_feature(p.org, "templates", "Templates")
     if body.sharing != "private" and not p.can("templates.share"): raise HTTPException(403, "Only template managers can share templates")
-    lim = (p.org.plan.limits or {}).get("templates")
-    if lim not in (None, -1) and db.query(Template).filter_by(org_id=p.org.id, archived=False).count() >= int(lim):
-        raise HTTPException(402, {"code": "quota_exceeded", "message": f"Your plan allows {lim} templates. Upgrade for unlimited templates."})
     env = envelope_access(db, p, body.envelope_id)
     ridx = {r.id: i for i, r in enumerate(env.recipients)}; didx = {d.id: i for i, d in enumerate(env.documents)}
     t = Template(org_id=p.org.id, owner_id=p.user.id, name=body.name, description=body.description, sharing=body.sharing, group_id=body.group_id, message=env.message,
@@ -91,7 +87,7 @@ class TemplatePatch(BaseModel):
 
 
 @router.put("/templates/{tid}")
-def update_template(tid: int, body: TemplatePatch, request: Request, p: Principal = Depends(perm("templates.create", "templates:write")), db: Session = Depends(get_db)):
+def update_template(tid: int, body: TemplatePatch, request: Request, p: Principal = Depends(perm("templates.create")), db: Session = Depends(get_db)):
     t = tpl_access(db, p, tid, write=True)
     if body.sharing and body.sharing != "private" and not p.can("templates.share"): raise HTTPException(403, "Only template managers can share templates")
     for k, v in body.model_dump(exclude_none=True).items():
@@ -104,7 +100,7 @@ def update_template(tid: int, body: TemplatePatch, request: Request, p: Principa
 
 
 @router.get("/templates/{tid}/versions")
-def versions(tid: int, p: Principal = Depends(scope("templates:read")), db: Session = Depends(get_db)):
+def versions(tid: int, p: Principal = Depends(org_member), db: Session = Depends(get_db)):
     tpl_access(db, p, tid)
     return [{"version": v.version, "created_at": v.created_at, "created_by": v.created_by} for v in db.query(TemplateVersion).filter_by(template_id=tid).order_by(TemplateVersion.version)]
 
@@ -170,9 +166,8 @@ def instantiate(db, org, user, templates: list[Template], title, message, roles:
 
 
 @router.post("/templates/use", status_code=201)
-def use_template(body: UseIn, request: Request, p: Principal = Depends(perm("envelopes.send", "envelopes:write")), db: Session = Depends(get_db)):
+def use_template(body: UseIn, request: Request, p: Principal = Depends(perm("envelopes.send")), db: Session = Depends(get_db)):
     tpls = [tpl_access(db, p, t) for t in body.template_ids]
-    if len(tpls) > 1: usage.require_feature(p.org, "combine_templates", "Combining templates")
     env = instantiate(db, p.org, p.user, tpls, body.title, body.message, [r.model_dump() for r in body.roles], body.prefill, request)
     if body.send:
         db.flush(); wf.send(db, p.org, env, p.user, request)
@@ -196,14 +191,11 @@ def parse_rows(data: bytes, filename: str) -> list[dict]:
 
 @router.post("/bulk", status_code=201)
 async def bulk_validate(request: Request, template_id: int = Form(...), name: str = Form("Bulk send"), file: UploadFile = File(...),
-                        p: Principal = Depends(perm("bulk.send", "bulk:write")), db: Session = Depends(get_db)):
+                        p: Principal = Depends(perm("bulk.send")), db: Session = Depends(get_db)):
     """Columns: for each template role N (1-based): roleN_name, roleN_email[, roleN_phone]; any other column = prefill by field label."""
-    usage.require_feature(p.org, "bulk_send", "Bulk send")
     t = tpl_access(db, p, template_id)
     rows = parse_rows(await file.read(), file.filename or "list.csv")
-    limit = int((p.org.plan.limits or {}).get("bulk_max_rows", 0) or 0)
     if not rows: raise HTTPException(422, "The list is empty")
-    if limit and len(rows) > limit: raise HTTPException(402, {"code": "bulk_limit", "message": f"Your plan allows {limit} recipients per bulk job ({len(rows)} given)"})
     out, valid = [], 0
     for i, row in enumerate(rows, start=2):
         errs = []
@@ -224,7 +216,7 @@ def bulk_out(j: BulkJob):
 
 
 @router.post("/bulk/{jid}/send")
-def bulk_send(jid: int, request: Request, p: Principal = Depends(perm("bulk.send", "bulk:write")), db: Session = Depends(get_db)):
+def bulk_send(jid: int, request: Request, p: Principal = Depends(perm("bulk.send")), db: Session = Depends(get_db)):
     j = db.get(BulkJob, jid)
     if not j or j.org_id != p.org.id or j.owner_id != p.user.id: raise HTTPException(404, "Bulk job not found")
     if j.status != "validated": raise HTTPException(409, "Job already processed")
@@ -281,7 +273,7 @@ class BulkActionIn(BaseModel):
 
 
 @router.post("/envelopes-bulk-action")
-def bulk_action(body: BulkActionIn, request: Request, p: Principal = Depends(perm("envelopes.send", "envelopes:write")), db: Session = Depends(get_db)):
+def bulk_action(body: BulkActionIn, request: Request, p: Principal = Depends(perm("envelopes.send")), db: Session = Depends(get_db)):
     done, errors = 0, []
     for eid in body.envelope_ids[:1000]:
         try:
@@ -294,116 +286,3 @@ def bulk_action(body: BulkActionIn, request: Request, p: Principal = Depends(per
             errors.append({"envelope_id": eid, "error": str(ex.detail)})
     db.commit()
     return {"done": done, "errors": errors}
-
-
-# ---------------- PowerForms ----------------
-class PowerFormIn(BaseModel):
-    template_id: int
-    name: str
-    signer_role_index: int = 0
-    max_uses: int | None = None
-    expires_at: str | None = None
-
-
-def pf_out(f: PowerForm):
-    return {**{k: getattr(f, k) for k in ("id", "template_id", "slug", "name", "signer_role_index", "enabled", "max_uses", "uses", "expires_at", "created_at")},
-            "url": f"{settings.PUBLIC_APP_URL}/pf/{f.slug}",
-            "embed_html": f'<iframe src="{settings.PUBLIC_APP_URL}/pf/{f.slug}?embed=1" width="100%" height="800" style="border:0"></iframe>'}
-
-
-@router.post("/powerforms", status_code=201)
-def create_powerform(body: PowerFormIn, request: Request, p: Principal = Depends(perm("templates.share", "powerforms:write")), db: Session = Depends(get_db)):
-    usage.require_feature(p.org, "powerforms", "PowerForms")
-    t = tpl_access(db, p, body.template_id)
-    if not 0 <= body.signer_role_index < len(t.roles): raise HTTPException(422, "Invalid signer role")
-    others = [r for i, r in enumerate(t.roles) if i != body.signer_role_index and not (r.get("locked") and r.get("email"))]
-    if others: raise HTTPException(422, "All other template roles must be locked with a name and email for a PowerForm")
-    f = PowerForm(org_id=p.org.id, owner_id=p.user.id, template_id=t.id, slug=secrets.token_urlsafe(12), name=body.name, signer_role_index=body.signer_role_index,
-                  max_uses=body.max_uses, expires_at=datetime.fromisoformat(body.expires_at) if body.expires_at else None)
-    db.add(f); audit.admin_log(db, p.org.id, p.user, "powerform.created", body.name, req=request); db.commit()
-    return pf_out(f)
-
-
-@router.get("/powerforms")
-def powerforms(p: Principal = Depends(org_member), db: Session = Depends(get_db)):
-    return [pf_out(f) for f in db.query(PowerForm).filter_by(org_id=p.org.id)]
-
-
-class PFPatch(BaseModel):
-    enabled: bool | None = None
-    max_uses: int | None = None
-
-
-@router.patch("/powerforms/{fid}")
-def patch_powerform(fid: int, body: PFPatch, request: Request, p: Principal = Depends(perm("templates.share")), db: Session = Depends(get_db)):
-    f = db.get(PowerForm, fid)
-    if not f or f.org_id != p.org.id: raise HTTPException(404, "PowerForm not found")
-    for k, v in body.model_dump(exclude_none=True).items(): setattr(f, k, v)
-    audit.admin_log(db, p.org.id, p.user, "powerform.updated", f.name, after=body.model_dump(exclude_none=True), req=request); db.commit()
-    return pf_out(f)
-
-
-def _pf(db, slug) -> PowerForm:
-    f = db.query(PowerForm).filter_by(slug=slug).first()
-    if not f or not f.enabled: raise HTTPException(404, "This form is not available")
-    if f.expires_at and f.expires_at < now(): raise HTTPException(410, "This form has expired")
-    if f.max_uses is not None and f.uses >= f.max_uses: raise HTTPException(410, "This form has reached its usage limit")
-    return f
-
-
-@router.get("/public/pf/{slug}")
-def pf_info(slug: str, db: Session = Depends(get_db)):
-    f = _pf(db, slug); org = db.get(Organization, f.org_id); t = db.get(Template, f.template_id)
-    return {"name": f.name, "organization": org.name, "branding": notify.brand_of(org), "role": t.roles[f.signer_role_index].get("role")}
-
-
-class PFStart(BaseModel):
-    name: str = PField(min_length=2, max_length=120)
-    email: EmailStr
-
-
-@router.post("/public/pf/{slug}/start")
-def pf_start(slug: str, body: PFStart, request: Request, db: Session = Depends(get_db)):
-    f = _pf(db, slug); org = db.get(Organization, f.org_id)
-    code = numeric_code(6)
-    raw = random_token(24)
-    db.add(OneTimeToken(kind="powerform", token_hash=sha256_hex(raw), org_id=org.id, email=str(body.email).lower(), expires_at=now() + timedelta(minutes=settings.OTP_MINUTES),
-                        data={"slug": slug, "name": body.name, "code_hash": keyed_hash(f"pf:{raw}", code), "attempts": 0}))
-    notify.send_email(db, org=org, to=str(body.email), kind="powerform_verify", subject=f"Verify your email to sign: {f.name}", code=code,
-                      body=f"Hello {body.name},\n\nEnter this code to verify your email and continue to \"{f.name}\". Valid {settings.OTP_MINUTES} minutes.")
-    db.commit()
-    return {"verification_id": raw}
-
-
-class PFVerify(BaseModel):
-    verification_id: str
-    code: str
-
-
-@router.post("/public/pf/{slug}/verify")
-def pf_verify(slug: str, body: PFVerify, request: Request, db: Session = Depends(get_db)):
-    import hmac
-    f = _pf(db, slug)
-    t = db.query(OneTimeToken).filter_by(kind="powerform", token_hash=sha256_hex(body.verification_id)).first()
-    if not t or t.used_at or t.expires_at < now() or t.data.get("slug") != slug: raise HTTPException(400, "Verification expired; start again")
-    if t.data.get("attempts", 0) >= settings.CODE_MAX_ATTEMPTS: raise HTTPException(423, "Too many attempts; start again")
-    if not hmac.compare_digest(keyed_hash(f"pf:{body.verification_id}", body.code.strip()), t.data["code_hash"]):
-        t.data = {**t.data, "attempts": t.data.get("attempts", 0) + 1}; db.commit()
-        raise HTTPException(403, "Incorrect code")
-    t.used_at = now()
-    org = db.get(Organization, f.org_id); owner = db.get(User, f.owner_id); tpl = db.get(Template, f.template_id)
-    roles = [{"name": r.get("name") or "", "email": r.get("email") or ""} for r in tpl.roles]
-    roles[f.signer_role_index] = {"name": t.data["name"], "email": t.email}
-    env = instantiate(db, org, owner, [tpl], f"{tpl.name} – {t.data['name']}", None, roles, {}, request, powerform_id=f.id)
-    target = env.recipients[f.signer_role_index]
-    target.auth_method = "none"
-    db.flush()
-    wf.send(db, org, env, owner, request)
-    f.uses += 1
-    tok = None; sess = None
-    if target in wf.current_step(env):
-        from ..core.security import random_token as rt
-        tok = rt(32); target.token_hash, target.token_revoked = sha256_hex(tok), False
-        sess = wf.open_session(db, env, target, request, "PowerForm email verification")
-    db.commit()
-    return {"envelope_id": env.public_id, "token": tok, "session": sess, "message": None if tok else "Thank you. You will be emailed when it is your turn to sign."}

@@ -9,9 +9,9 @@ from ..core.config import settings
 from ..core.db import get_db
 from ..core.security import sha256_hex, keyed_hash
 from ..models import (Envelope, EnvelopeDocument, Recipient, Field, AuditEvent, User, IdempotencyKey, DeletionRecord, FIELD_TYPES, now)
-from ..services import workflow as wf, audit, usage
+from ..services import workflow as wf, audit
 from ..services.storage import storage
-from .deps import Principal, perm, org_member, scope, envelope_access, user_groups
+from .deps import Principal, perm, org_member, envelope_access, user_groups
 from .serializers import envelope_out
 
 router = APIRouter(prefix="/envelopes", tags=["envelopes"])
@@ -32,7 +32,7 @@ class EnvelopeIn(BaseModel):
 
 
 @router.post("", status_code=201)
-def create(body: EnvelopeIn, request: Request, idempotency_key: str | None = Header(None), p: Principal = Depends(perm("envelopes.send", "envelopes:write")),
+def create(body: EnvelopeIn, request: Request, idempotency_key: str | None = Header(None), p: Principal = Depends(perm("envelopes.send")),
            db: Session = Depends(get_db)):
     if idempotency_key:
         prev = db.query(IdempotencyKey).filter_by(org_id=p.org.id, key=f"env:{idempotency_key}").first()
@@ -42,7 +42,7 @@ def create(body: EnvelopeIn, request: Request, idempotency_key: str | None = Hea
                    visibility=body.visibility or s["default_visibility"], group_id=body.group_id, labels=body.labels, folder=body.folder, language=body.language,
                    reminder_first_days=s["reminder_first_days"], reminder_every_days=s["reminder_every_days"], is_sandbox=p.org.is_sandbox)
     db.add(env); db.flush()
-    audit.record(db, env, "created", p.user.email, request, f"via {p.via}")
+    audit.record(db, env, "created", p.user.email, request, "via web")
     out = envelope_out(db, env)
     if idempotency_key:
         db.add(IdempotencyKey(org_id=p.org.id, key=f"env:{idempotency_key}", response=json.loads(json.dumps(out, default=str))))
@@ -54,7 +54,7 @@ def create(body: EnvelopeIn, request: Request, idempotency_key: str | None = Hea
 def list_envelopes(request: Request, status: str | None = None, q: str | None = None, label: str | None = None, folder: str | None = None,
                    sender: int | None = None, recipient: str | None = None, box: str = "all", date_from: str | None = None, date_to: str | None = None,
                    sort: str = "-updated_at", page: int = 1, page_size: int = Query(25, le=200),
-                   p: Principal = Depends(scope("envelopes:read")), db: Session = Depends(get_db)):
+                   p: Principal = Depends(org_member), db: Session = Depends(get_db)):
     qry = db.query(Envelope).filter(Envelope.org_id == p.org.id, Envelope.deleted_at.is_(None))
     if box == "waiting_for_me":
         rids = [r.envelope_id for r in db.query(Recipient).filter(func.lower(Recipient.email) == p.user.email, Recipient.status.notin_(("completed", "declined")))]
@@ -108,29 +108,27 @@ def dashboard(p: Principal = Depends(org_member), db: Session = Depends(get_db))
     titles = {e.id: e.title for e in envs}
     return {"total": len(envs), "counts": counts, "waiting_for_me": waiting_me, "waiting_for_others": sum(counts.get(s, 0) for s in wf.OPEN),
             "expiring_soon": [{"id": e.id, "title": e.title, "expires_at": e.expires_at} for e in soon],
-            "recent": [{"envelope_id": a.envelope_id, "title": titles.get(a.envelope_id), "event": a.event, "actor": a.actor, "created_at": a.created_at} for a in recent],
-            "usage": usage.summary(db, p.org)}
+            "recent": [{"envelope_id": a.envelope_id, "title": titles.get(a.envelope_id), "event": a.event, "actor": a.actor, "created_at": a.created_at} for a in recent]}
 
 
 @router.get("/{env_id}")
-def get_envelope(env_id: int, p: Principal = Depends(scope("envelopes:read")), db: Session = Depends(get_db)):
+def get_envelope(env_id: int, p: Principal = Depends(org_member), db: Session = Depends(get_db)):
     env = envelope_access(db, p, env_id); wf.check_expiry(db, env)
     return envelope_out(db, env, full=True)
 
 
 @router.post("/{env_id}/documents")
-async def upload_document(env_id: int, request: Request, file: UploadFile = File(...), p: Principal = Depends(perm("envelopes.send", "envelopes:write")),
+async def upload_document(env_id: int, request: Request, file: UploadFile = File(...), p: Principal = Depends(perm("envelopes.send")),
                           db: Session = Depends(get_db)):
     env = envelope_access(db, p, env_id, write=True)
     data = await file.read()
     d = wf.add_document(db, p.org, env, file.filename or "document.pdf", data, request, p.user.email)
-    usage.check_and_record(db, p.org, "storage_bytes", d.size)
     db.commit()
     return envelope_out(db, env, full=True)
 
 
 @router.delete("/{env_id}/documents/{doc_id}")
-def remove_document(env_id: int, doc_id: int, request: Request, p: Principal = Depends(perm("envelopes.send", "envelopes:write")), db: Session = Depends(get_db)):
+def remove_document(env_id: int, doc_id: int, request: Request, p: Principal = Depends(perm("envelopes.send")), db: Session = Depends(get_db)):
     env = envelope_access(db, p, env_id, write=True)
     if env.status != "draft": raise HTTPException(409, "Only drafts can be changed")
     d = next((x for x in env.documents if x.id == doc_id), None)
@@ -149,7 +147,7 @@ class ReorderIn(BaseModel):
 
 
 @router.post("/{env_id}/documents/reorder")
-def reorder(env_id: int, body: ReorderIn, p: Principal = Depends(perm("envelopes.send", "envelopes:write")), db: Session = Depends(get_db)):
+def reorder(env_id: int, body: ReorderIn, p: Principal = Depends(perm("envelopes.send")), db: Session = Depends(get_db)):
     env = envelope_access(db, p, env_id, write=True)
     if env.status != "draft": raise HTTPException(409, "Only drafts can be changed")
     if sorted(body.document_ids) != sorted(d.id for d in env.documents): raise HTTPException(422, "Provide all document ids")
@@ -159,7 +157,7 @@ def reorder(env_id: int, body: ReorderIn, p: Principal = Depends(perm("envelopes
 
 
 @router.get("/{env_id}/documents/{doc_id}/file")
-def document_file(env_id: int, doc_id: int, p: Principal = Depends(scope("envelopes:read")), db: Session = Depends(get_db)):
+def document_file(env_id: int, doc_id: int, p: Principal = Depends(org_member), db: Session = Depends(get_db)):
     env = envelope_access(db, p, env_id)
     d = next((x for x in env.documents if x.id == doc_id), None)
     if not d: raise HTTPException(404, "Document not found")
@@ -234,7 +232,6 @@ def apply_prepare(db, p: Principal, env: Envelope, body: PrepareIn):
         v = getattr(body, k)
         if v is not None: setattr(env, k, v)
     if body.expires_at: env.expires_at = datetime.fromisoformat(body.expires_at.replace("Z", ""))
-    if body.brand is not None and body.brand: usage.require_feature(p.org, "branding", "Custom branding")
     if body.recipients is not None:
         for f in list(env.fields): env.fields.remove(f); db.delete(f)
         for r in list(env.recipients): env.recipients.remove(r); db.delete(r)
@@ -242,10 +239,7 @@ def apply_prepare(db, p: Principal, env: Envelope, body: PrepareIn):
         mapping = {}
         for i, ri in enumerate(body.recipients):
             if ri.type not in RTYPES: raise HTTPException(422, f"Unknown recipient type {ri.type}")
-            if ri.type in ("witness", "editor"):
-                usage.require_feature(p.org, "advanced_roles", f"Recipient role '{ri.type}'")
             if ri.type == "in_person":
-                usage.require_feature(p.org, "in_person", "In-person signing")
                 host = db.get(User, ri.host_user_id) if ri.host_user_id else None
                 if not host or host.org_id != p.org.id: raise HTTPException(422, "In-person signer needs a host from your organization")
             auth = ri.auth_method or s["default_auth"]
@@ -281,7 +275,7 @@ def apply_prepare(db, p: Principal, env: Envelope, body: PrepareIn):
 
 
 @router.put("/{env_id}")
-def prepare(env_id: int, body: PrepareIn, request: Request, p: Principal = Depends(perm("envelopes.send", "envelopes:write")), db: Session = Depends(get_db)):
+def prepare(env_id: int, body: PrepareIn, request: Request, p: Principal = Depends(perm("envelopes.send")), db: Session = Depends(get_db)):
     env = envelope_access(db, p, env_id, write=True)
     if env.status != "draft": raise HTTPException(409, "Only drafts can be edited; use correct for sent envelopes")
     apply_prepare(db, p, env, body)
@@ -291,7 +285,7 @@ def prepare(env_id: int, body: PrepareIn, request: Request, p: Principal = Depen
 
 
 @router.post("/{env_id}/send")
-def send(env_id: int, request: Request, p: Principal = Depends(perm("envelopes.send", "envelopes:write")), db: Session = Depends(get_db)):
+def send(env_id: int, request: Request, p: Principal = Depends(perm("envelopes.send")), db: Session = Depends(get_db)):
     env = envelope_access(db, p, env_id, write=True)
     wf.send(db, p.org, env, p.user, request)
     db.commit()
@@ -304,7 +298,7 @@ class ReasonIn(BaseModel):
 
 
 @router.post("/{env_id}/void")
-def void(env_id: int, body: ReasonIn, request: Request, p: Principal = Depends(perm("envelopes.send", "envelopes:write")), db: Session = Depends(get_db)):
+def void(env_id: int, body: ReasonIn, request: Request, p: Principal = Depends(perm("envelopes.send")), db: Session = Depends(get_db)):
     env = envelope_access(db, p, env_id, write=True)
     wf.void(db, p.org, env, p.user, body.reason, request); db.commit()
     return envelope_out(db, env)
@@ -318,7 +312,7 @@ class CorrectIn(BaseModel):
 
 
 @router.post("/{env_id}/correct")
-def correct(env_id: int, body: CorrectIn, request: Request, p: Principal = Depends(perm("envelopes.send", "envelopes:write")), db: Session = Depends(get_db)):
+def correct(env_id: int, body: CorrectIn, request: Request, p: Principal = Depends(perm("envelopes.send")), db: Session = Depends(get_db)):
     env = envelope_access(db, p, env_id, write=True)
     wf.correct(db, p.org, env, p.user, body.model_dump(), request); db.commit()
     return envelope_out(db, env, full=True)
@@ -329,7 +323,7 @@ class ReissueIn(BaseModel):
 
 
 @router.post("/{env_id}/recipients/{rid}/reissue")
-def reissue(env_id: int, rid: int, request: Request, body: ReissueIn | None = None, p: Principal = Depends(perm("envelopes.send", "envelopes:write")), db: Session = Depends(get_db)):
+def reissue(env_id: int, rid: int, request: Request, body: ReissueIn | None = None, p: Principal = Depends(perm("envelopes.send")), db: Session = Depends(get_db)):
     env = envelope_access(db, p, env_id, write=True)
     r = next((x for x in env.recipients if x.id == rid), None)
     if not r: raise HTTPException(404, "Recipient not found")
@@ -340,7 +334,7 @@ def reissue(env_id: int, rid: int, request: Request, body: ReissueIn | None = No
 
 
 @router.post("/{env_id}/remind")
-def remind(env_id: int, request: Request, p: Principal = Depends(perm("envelopes.send", "envelopes:write")), db: Session = Depends(get_db)):
+def remind(env_id: int, request: Request, p: Principal = Depends(perm("envelopes.send")), db: Session = Depends(get_db)):
     env = envelope_access(db, p, env_id, write=True)
     if env.status not in wf.OPEN: raise HTTPException(409, "Envelope is not in progress")
     n = sum(wf.remind(db, p.org, env, r, request, p.user.email) for r in wf.current_step(env))
@@ -353,7 +347,7 @@ class ExtendIn(BaseModel):
 
 
 @router.post("/{env_id}/extend")
-def extend(env_id: int, body: ExtendIn, request: Request, p: Principal = Depends(perm("envelopes.send", "envelopes:write")), db: Session = Depends(get_db)):
+def extend(env_id: int, body: ExtendIn, request: Request, p: Principal = Depends(perm("envelopes.send")), db: Session = Depends(get_db)):
     env = envelope_access(db, p, env_id, write=True)
     if env.status not in wf.OPEN and env.status != "expired": raise HTTPException(409, "Only open or expired envelopes can be extended")
     base = max(env.expires_at or now(), now())
@@ -368,7 +362,7 @@ def extend(env_id: int, body: ExtendIn, request: Request, p: Principal = Depends
 
 
 @router.post("/{env_id}/duplicate", status_code=201)
-def duplicate(env_id: int, request: Request, p: Principal = Depends(perm("envelopes.send", "envelopes:write")), db: Session = Depends(get_db)):
+def duplicate(env_id: int, request: Request, p: Principal = Depends(perm("envelopes.send")), db: Session = Depends(get_db)):
     src = envelope_access(db, p, env_id)
     env = Envelope(org_id=p.org.id, owner_id=p.user.id, public_id=wf.public_id(), title=f"Copy of {src.title}"[:200], message=src.message, visibility=src.visibility,
                    group_id=src.group_id, labels=list(src.labels or []), folder=src.folder, language=src.language, reminder_first_days=src.reminder_first_days,
@@ -395,7 +389,7 @@ def duplicate(env_id: int, request: Request, p: Principal = Depends(perm("envelo
 
 
 @router.delete("/{env_id}")
-def delete(env_id: int, request: Request, p: Principal = Depends(perm("envelopes.send", "envelopes:write")), db: Session = Depends(get_db)):
+def delete(env_id: int, request: Request, p: Principal = Depends(perm("envelopes.send")), db: Session = Depends(get_db)):
     env = envelope_access(db, p, env_id, write=True)
     if env.status in wf.OPEN: raise HTTPException(409, "Void the envelope before deleting it")
     if env.legal_hold: raise HTTPException(423, "Envelope is on legal hold")
@@ -432,7 +426,7 @@ def _completed(env):
 
 @router.get("/{env_id}/completed")
 def completed(env_id: int, request: Request, mode: str = "combined", certificate: bool = True, document_id: int | None = None,
-              p: Principal = Depends(scope("envelopes:read")), db: Session = Depends(get_db)):
+              p: Principal = Depends(org_member), db: Session = Depends(get_db)):
     """mode=combined (sealed PDF incl. certificate) | separate (one stamped document, document_id required, unsealed)"""
     env = envelope_access(db, p, env_id); _completed(env)
     st = storage()
@@ -456,14 +450,14 @@ def completed(env_id: int, request: Request, mode: str = "combined", certificate
 
 
 @router.get("/{env_id}/certificate")
-def certificate(env_id: int, request: Request, p: Principal = Depends(scope("envelopes:read")), db: Session = Depends(get_db)):
+def certificate(env_id: int, request: Request, p: Principal = Depends(org_member), db: Session = Depends(get_db)):
     env = envelope_access(db, p, env_id); _completed(env)
     audit.record(db, env, "downloaded", p.user.email, request, "certificate"); db.commit()
     return pdf_resp(storage().get(p.org.region, env.certificate_key), f"{env.public_id}-certificate.pdf")
 
 
 @router.get("/{env_id}/audit")
-def audit_trail(env_id: int, format: str = "json", p: Principal = Depends(perm("audit.view", "audit:read")), db: Session = Depends(get_db)):
+def audit_trail(env_id: int, format: str = "json", p: Principal = Depends(perm("audit.view")), db: Session = Depends(get_db)):
     env = envelope_access(db, p, env_id)
     events = db.query(AuditEvent).filter_by(envelope_id=env.id).order_by(AuditEvent.id).all()
     ok, bad = audit.verify_chain(events)
@@ -495,7 +489,7 @@ def audit_pdf(env, events, ok) -> bytes:
 
 
 @router.get("/{env_id}/evidence")
-def evidence(env_id: int, request: Request, p: Principal = Depends(perm("audit.view", "audit:read")), db: Session = Depends(get_db)):
+def evidence(env_id: int, request: Request, p: Principal = Depends(perm("audit.view")), db: Session = Depends(get_db)):
     env = envelope_access(db, p, env_id); _completed(env)
     events = db.query(AuditEvent).filter_by(envelope_id=env.id).order_by(AuditEvent.id).all()
     ok, _ = audit.verify_chain(events)

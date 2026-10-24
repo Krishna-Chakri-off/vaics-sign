@@ -6,4 +6,4 @@
 5. **Outbox** (dev): each signer gets two emails, one with the link and one with the access code. Open Signer 1's link, enter the code, accept consent, click Start, adopt a signature (type, draw or upload), enter a reason, then Finish.
 6. Signer 2 is only invited after that. Repeat the steps.
 7. Completion: the sealed PDF and certificate are emailed (outbox) to all parties. Stamps show the reason, IST and UTC time, and the SHA-256 hash. Check it on **/verify** with the envelope ID or by uploading the PDF.
-8. Also try: templates and bulk send (CSV/XLSX), PowerForms (public link), void/decline/correct, in-person signing, Admin (users, groups, branding, API keys, webhooks, audit export), Billing (plans and GST invoice PDF; checkout returns "not configured"), Reports, and Platform console (sign in as platform@example.com).
+8. Also try: templates and bulk send (CSV/XLSX), void/decline/correct, in-person signing (host a signer on your device), Admin (users, groups, branding, audit export, privacy & retention), Reports, and My account (MFA, sessions, my data requests).

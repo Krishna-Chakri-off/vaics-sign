@@ -1,11 +1,31 @@
 """Upload validation, malware scan, conversion to PDF, page geometry and text extraction."""
 import io, os, shutil, socket, subprocess, tempfile
+from pathlib import Path
 from fastapi import HTTPException
 from ..core.config import settings
 
 PDF_MIME = "application/pdf"
 CONVERTIBLE = {".doc", ".docx", ".odt", ".rtf", ".txt", ".xls", ".xlsx", ".ods", ".csv", ".ppt", ".pptx", ".odp", ".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tif", ".tiff"}
 MAGIC = {b"%PDF-": ".pdf", b"PK\x03\x04": "zip", b"\xd0\xcf\x11\xe0": "ole", b"\x89PNG": ".png", b"\xff\xd8\xff": ".jpg", b"GIF8": ".gif", b"BM": ".bmp", b"II*\x00": ".tif", b"MM\x00*": ".tif", b"{\\rtf": ".rtf"}
+
+
+WINDOWS_SOFFICE = [r"C:\Program Files\LibreOffice\program\soffice.exe", r"C:\Program Files (x86)\LibreOffice\program\soffice.exe"]
+OTHER_SOFFICE = ["/usr/bin/soffice", "/usr/lib/libreoffice/program/soffice", "/opt/libreoffice/program/soffice",
+                 "/Applications/LibreOffice.app/Contents/MacOS/soffice"]
+
+
+def find_soffice() -> str | None:
+    """SOFFICE_PATH (a full path or a command on PATH), then the usual LibreOffice install locations."""
+    cfg = settings.SOFFICE_PATH or "soffice"
+    if os.path.isfile(cfg):
+        return cfg
+    found = shutil.which(cfg) or shutil.which("soffice") or shutil.which("libreoffice")
+    if found:
+        return found
+    for c in (WINDOWS_SOFFICE if os.name == "nt" else OTHER_SOFFICE):
+        if os.path.isfile(c):
+            return c
+    return None
 
 
 def sniff(data: bytes) -> str | None:
@@ -43,14 +63,14 @@ def to_pdf(filename: str, data: bytes) -> tuple[bytes, str]:
         raise HTTPException(415, "Unsupported file type. Upload PDF, Word, Excel, PowerPoint, text or image files.")
     if kind is None and ext not in (".txt", ".csv"):
         raise HTTPException(415, "File content does not match its extension.")
-    soffice = shutil.which(settings.SOFFICE_PATH)
+    soffice = find_soffice()
     if not soffice:
         raise HTTPException(501, "Document conversion is not available on this server (LibreOffice not installed). Upload a PDF.")
     with tempfile.TemporaryDirectory() as td:
         src = os.path.join(td, "input" + ext)
         with open(src, "wb") as fh: fh.write(data)
         try:
-            subprocess.run([soffice, "--headless", "--norestore", f"-env:UserInstallation=file://{td}/profile", "--convert-to", "pdf", "--outdir", td, src],
+            subprocess.run([soffice, "--headless", "--norestore", "-env:UserInstallation=" + (Path(td) / "profile").as_uri(), "--convert-to", "pdf", "--outdir", td, src],
                            check=True, timeout=120, capture_output=True)
         except (subprocess.SubprocessError, OSError):
             raise HTTPException(422, "The document could not be converted to PDF.")

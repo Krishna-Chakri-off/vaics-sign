@@ -4,7 +4,7 @@ from datetime import timedelta
 from ..core.config import settings
 from ..core.db import SessionLocal
 from ..models import Envelope, Organization, User, now
-from . import workflow as wf, notify, audit, webhooks, retention
+from . import workflow as wf, notify, audit, retention
 
 log = logging.getLogger("vaics.jobs")
 
@@ -49,34 +49,11 @@ def expire(db) -> int:
     return n
 
 
-def billing(db) -> int:
-    n = 0
-    for org in db.query(Organization).filter(Organization.status == "trial", Organization.trial_ends_at.isnot(None)):
-        admin = db.query(User).filter_by(org_id=org.id, role="org_admin", is_active=True).first()
-        if not org.trial_reminded and org.trial_ends_at - now() <= timedelta(days=3) and admin:
-            notify.send_email(db, org=org, to=admin.email, kind="trial_ending", subject="Your VAICS Sign trial ends soon",
-                              body=f"Your trial ends on {org.trial_ends_at:%d %b %Y}. Choose a plan to keep sending documents.", link=f"{settings.PUBLIC_APP_URL}/admin/billing")
-            org.trial_reminded = True; n += 1
-        if org.trial_ends_at < now():
-            from ..models import Plan
-            free = db.query(Plan).filter_by(code="free").first()
-            org.plan_id, org.status = free.id, "active"
-            audit.admin_log(db, org.id, "system", "billing.trial_ended", org.slug, after={"plan": "free"}); n += 1
-    for org in db.query(Organization).filter(Organization.status == "past_due", Organization.grace_until.isnot(None), Organization.grace_until < now()):
-        org.status = "restricted"
-        audit.admin_log(db, org.id, "system", "billing.restricted", org.slug, after={"reason": "payment grace period ended"}); n += 1
-    for org in db.query(Organization).filter(Organization.status == "active", Organization.current_period_end.isnot(None), Organization.current_period_end < now()):
-        org.status, org.grace_until = "past_due", now() + timedelta(days=7)
-        audit.admin_log(db, org.id, "system", "billing.renewal_due", org.slug); n += 1
-    db.commit()
-    return n
-
-
 def run_all() -> dict:
     db = SessionLocal()
     try:
-        out = {"reminders": reminders(db), "expiry_warnings": expiry_warnings(db), "expired": expire(db), "billing": billing(db),
-               "webhooks": webhooks.deliver_due(db), "purged": retention.run_retention(db)}
+        out = {"reminders": reminders(db), "expiry_warnings": expiry_warnings(db), "expired": expire(db),
+               "purged": retention.run_retention(db)}
         db.commit()
         return out
     finally:

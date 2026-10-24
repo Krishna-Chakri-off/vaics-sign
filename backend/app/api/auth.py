@@ -1,4 +1,4 @@
-"""Sign-up, email verification, login with lockout + MFA (TOTP), sessions, password reset, invitations."""
+"""Email verification, login with lockout + MFA (TOTP), sessions, password reset, invitations."""
 import re, secrets
 from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -8,21 +8,13 @@ from ..core.config import settings
 from ..core.db import get_db
 from ..core.security import (hash_password, verify_password, create_access_token, random_token, sha256_hex, password_problems,
                              new_totp_secret, verify_totp, totp_uri)
-from ..models import User, Organization, Plan, UserSession, OneTimeToken, Invitation, LegalAcceptance, now
+from ..models import User, Organization, UserSession, OneTimeToken, Invitation, LegalAcceptance, now
 from ..services import notify, audit
 from ..services.workflow import org_settings
 from .deps import get_principal, Principal
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 LEGAL_VERSIONS = {"tos": "2026-10", "privacy": "2026-10", "dpa": "2026-10"}
-REGION_BY_COUNTRY = {"IN": "in", "US": "us", "CA": "us", "MX": "us", "BR": "us"}
-EU = {"AT", "BE", "BG", "HR", "CY", "CZ", "DK", "EE", "FI", "FR", "DE", "GR", "HU", "IE", "IT", "LV", "LT", "LU", "MT", "NL", "PL", "PT", "RO", "SK", "SI", "ES", "SE", "GB", "CH", "NO", "IS"}
-CURRENCY = {"IN": "INR", "US": "USD"}
-
-
-def region_for(country: str) -> str:
-    c = country.upper()
-    return "eu" if c in EU else REGION_BY_COUNTRY.get(c, "us")
 
 
 def issue_token(db, kind, hours=None, minutes=None, **kw) -> str:
@@ -52,58 +44,9 @@ def user_out(u: User, org: Organization | None = None) -> dict:
     d = {k: getattr(u, k) for k in ("id", "email", "full_name", "title", "company", "role", "email_verified", "mfa_enabled", "language", "timezone", "onboarding_done", "org_id", "notify_prefs")}
     if org:
         d["org"] = {"id": org.id, "name": org.name, "slug": org.slug, "status": org.status, "region": org.region, "country": org.country,
-                    "plan": org.plan.code if org.plan else None, "plan_name": org.plan.name if org.plan else None, "features": (org.plan.features if org.plan else {}),
-                    "trial_ends_at": org.trial_ends_at, "is_sandbox": org.is_sandbox, "branding": notify.brand_of(org)}
+                    "branding": notify.brand_of(org)}
     return d
 
-
-def slugify(name: str, db) -> str:
-    base = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:40] or "org"
-    slug, i = base, 1
-    while db.query(Organization).filter_by(slug=slug).first():
-        i += 1; slug = f"{base}-{i}"
-    return slug
-
-
-class SignupIn(BaseModel):
-    full_name: str = PField(min_length=2, max_length=120)
-    email: EmailStr
-    password: str
-    organization: str = PField(min_length=2, max_length=200)
-    country: str = PField(min_length=2, max_length=2)
-    accept_terms: bool
-    sandbox: bool = False
-
-
-@router.post("/signup", status_code=201)
-def signup(body: SignupIn, request: Request, db: Session = Depends(get_db)):
-    if not settings.SAAS_MODE:
-        raise HTTPException(404, "Self-service sign-up is disabled. Ask a VAICS Sign administrator for an invitation.")
-    if not body.accept_terms:
-        raise HTTPException(422, "Accept the Terms of Service, Privacy Policy and Data Processing Agreement")
-    email = str(body.email).lower()
-    if db.query(User).filter_by(email=email).first():
-        raise HTTPException(409, "An account with this email already exists")
-    probs = password_problems(body.password, email=email)
-    if probs:
-        raise HTTPException(422, "Password must have " + ", ".join(probs))
-    plan = db.query(Plan).filter_by(code="sandbox" if body.sandbox else settings.TRIAL_PLAN).first() or db.query(Plan).first()
-    c = body.country.upper()
-    org = Organization(name=body.organization.strip(), slug=slugify(body.organization, db), country=c, region=region_for(c), plan_id=plan.id if plan else None,
-                       status="active" if body.sandbox else "trial", trial_ends_at=None if body.sandbox else now() + timedelta(days=settings.TRIAL_DAYS),
-                       currency=CURRENCY.get(c, "EUR" if c in EU and c != "GB" else "USD"), seats=3, is_sandbox=body.sandbox, settings={}, branding={})
-    db.add(org); db.flush()
-    u = User(org_id=org.id, email=email, full_name=body.full_name.strip(), role="org_admin", password_hash=hash_password(body.password), password_changed_at=now(),
-             timezone="Asia/Kolkata" if c == "IN" else "UTC")
-    db.add(u); db.flush()
-    ip = audit.client_ip(request)
-    for doc, ver in LEGAL_VERSIONS.items():
-        db.add(LegalAcceptance(user_id=u.id, document=doc, version=ver, ip=ip))
-    audit.admin_log(db, org.id, u, "org.created", org.slug, after={"region": org.region, "plan": plan.code if plan else None, "sandbox": body.sandbox}, req=request)
-    send_verification(db, u, org)
-    db.commit()
-    return {"message": "Account created. Check your email to verify your address.", "org_id": org.id, "region": org.region,
-            "email_mode": "smtp" if notify.smtp_configured() else "dev_outbox"}
 
 
 @router.post("/verify-email/{token}")
@@ -387,8 +330,6 @@ def accept_invite(body: AcceptIn, request: Request, db: Session = Depends(get_db
     if not inv or inv.status != "pending": raise HTTPException(400, "Invitation no longer valid")
     if db.query(User).filter_by(email=t.email).first(): raise HTTPException(409, "An account with this email already exists")
     org = db.get(Organization, t.org_id)
-    if db.query(User).filter_by(org_id=org.id, is_active=True).count() >= org.seats:
-        raise HTTPException(402, {"code": "seats_exhausted", "message": "No free seats. Ask your admin to add seats."})
     u = User(org_id=org.id, email=t.email, full_name=body.full_name.strip(), role=inv.role, email_verified=True)
     db.add(u); db.flush()
     set_password(db, u, body.password)

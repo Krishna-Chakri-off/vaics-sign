@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from ..core.config import settings
 from ..core.security import sha256_hex, random_token, numeric_code, keyed_hash
 from ..models import Envelope, EnvelopeDocument, Recipient, Field, Organization, User, AuditEvent, now
-from . import audit, notify, usage, i18n
+from . import audit, notify, i18n
 from .storage import storage, new_key
 
 ACTING = ("signer", "approver", "viewer", "in_person", "witness", "editor")
@@ -42,7 +42,7 @@ def add_document(db, org, env, filename: str, data: bytes, req=None, actor: str 
     from . import documents
     if env.status != "draft":
         raise HTTPException(409, "Documents can only be changed while the envelope is a draft")
-    if len(data) > settings.MAX_DOC_MB * 1024 * 1024 or len(data) > int((org.plan.limits or {}).get("doc_mb", settings.MAX_DOC_MB)) * 1024 * 1024:
+    if len(data) > settings.MAX_DOC_MB * 1024 * 1024:
         raise HTTPException(413, f"Each document must be {settings.MAX_DOC_MB} MB or smaller")
     if len(env.documents) >= settings.MAX_DOCS_PER_ENVELOPE:
         raise HTTPException(422, f"An envelope can contain at most {settings.MAX_DOCS_PER_ENVELOPE} documents")
@@ -82,31 +82,26 @@ def validate_send(env: Envelope, org) -> None:
         if r.auth_method not in s["allowed_auth"]: errs.append(f"Authentication '{r.auth_method}' is not allowed by your organization for {r.name}")
         if r.auth_method == "sms_otp":
             if not r.phone: errs.append(f"{r.name} needs a mobile number for SMS OTP")
-            usage.require_feature(org, "sms_otp", "SMS OTP")
         if r.type == "in_person" and not r.host_user_id: errs.append(f"In-person signer {r.name} needs a host")
         if r.signature_type != "electronic":
             from .trust import PROVIDERS
             p = PROVIDERS.get(r.signature_type)
             if not p or not p.configured():
                 errs.append(f"{r.signature_type} signing is not available: provider not configured / not implemented")
-    orders = [r.order for r in acting]
-    if len(set(orders)) < len(orders):
-        usage.require_feature(org, "parallel_routing", "Parallel routing")
     if errs:
         raise HTTPException(422, {"code": "not_ready", "errors": errs, "message": "; ".join(errs)})
 
 
 def send(db, org, env: Envelope, user: User, req=None):
     if env.status != "draft": raise HTTPException(409, "Envelope already sent")
-    if org.status in ("restricted", "suspended", "closed"): raise HTTPException(402, f"Sending is disabled: organization is {org.status}")
+    if org.status in ("suspended", "closed"): raise HTTPException(403, f"Sending is disabled: organization is {org.status}")
     if not user.email_verified: raise HTTPException(403, "Verify your email address before sending documents")
     validate_send(env, org)
-    usage.check_and_record(db, org, "envelopes")
     s = org_settings(org)
     env.status, env.sent_at = "sent", now()
     if not env.expires_at: env.expires_at = now() + timedelta(days=int(s["envelope_expiry_days"]))
     env.is_sandbox = org.is_sandbox
-    audit.record(db, env, "sent", user.email, req, f"{len(env.recipients)} recipient(s); expires {env.expires_at:%Y-%m-%d}; sandbox={org.is_sandbox}")
+    audit.record(db, env, "sent", user.email, req, f"{len(env.recipients)} recipient(s); expires {env.expires_at:%Y-%m-%d}")
     route(db, org, env, req)
 
 
@@ -253,7 +248,6 @@ def send_otp(db, org, env, r, req):
     code = numeric_code(6)
     r.code_hash, r.code_expires_at, r.otp_sends = keyed_hash(f"otp:{r.id}", code), now() + timedelta(minutes=settings.OTP_MINUTES), r.otp_sends + 1
     if r.auth_method == "sms_otp":
-        usage.check_and_record(db, org, "sms")
         m = notify.send_sms(db, org=org, to=r.phone, kind="otp", envelope=env, code=code, body=f"{code} is your VAICS Sign code for {env.title}. Valid {settings.OTP_MINUTES} min.")
     else:
         m = notify.send_email(db, org=org, to=r.email, kind="otp", envelope=env, code=code, lang=r.language,

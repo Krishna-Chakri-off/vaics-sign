@@ -1,18 +1,17 @@
-"""VAICS Sign – multi-tenant e-signature SaaS API."""
+"""VAICS Sign – internal e-signature service for VAICS."""
 import logging
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from .core.config import settings
 from .core.db import Base, engine
 from .core.middleware import SecurityHeaders, RateLimit
-from .api import auth, envelopes, signing, admin, billing, platform, templates, reports, verify, privacy
+from .api import auth, envelopes, signing, admin, templates, reports, verify, privacy
 
 logging.basicConfig(level=logging.INFO)
-TAGS = [{"name": n} for n in ("auth", "envelopes", "templates, bulk send, powerforms", "signing (public)", "public verification", "organization admin",
-                                "billing", "reports", "privacy", "platform admin")]
+TAGS = [{"name": n} for n in ("auth", "envelopes", "templates & bulk send", "signing (public)", "public verification", "organization admin",
+                                "reports", "privacy")]
 app = FastAPI(title="VAICS Sign API", version="1.0.0", openapi_tags=TAGS, docs_url="/api/docs", redoc_url="/api/redoc", openapi_url="/api/v1/openapi.json",
-              description="VAICS Sign e-signature platform. Authenticate with `Authorization: Bearer <JWT>` (web) or `X-API-Key: vsk_...` (integrations). "
-                          "Webhooks are signed with `X-VAICS-Signature: t=<unix>,v1=<hex HMAC-SHA256 of '<t>.<body>'>`.")
+              description="VAICS Sign internal e-signature service. Authenticate with `Authorization: Bearer <JWT>`.")
 app.add_middleware(RateLimit)
 app.add_middleware(SecurityHeaders)
 app.add_middleware(CORSMiddleware, allow_origins=[o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()],
@@ -21,12 +20,8 @@ app.add_middleware(CORSMiddleware, allow_origins=[o.strip() for o in settings.CO
                    expose_headers=["Content-Disposition", "X-RateLimit-Limit", "X-RateLimit-Remaining", "Retry-After"])
 
 v1 = APIRouter(prefix="/api/v1")
-from fastapi import Depends as _Depends
-from .api.deps import saas_only
 for m in (auth, envelopes, signing, admin, templates, reports, verify, privacy):
     v1.include_router(m.router)
-for m in (billing, platform):  # SaaS-only surfaces, 404 unless SAAS_MODE=true
-    v1.include_router(m.router, dependencies=[_Depends(saas_only)])
 app.include_router(v1)
 
 
@@ -42,8 +37,6 @@ def startup():
     from . import models  # noqa: F401
     if settings.AUTO_CREATE_TABLES:
         Base.metadata.create_all(bind=engine)
-        from .seed import ensure_plans
-        ensure_plans()
     if settings.RUN_SCHEDULER:
         from .services.jobs import start_scheduler
         start_scheduler()

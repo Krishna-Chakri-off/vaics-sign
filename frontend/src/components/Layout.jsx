@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useNavigate, Link } from 'react-router-dom'
-import { FiGrid, FiInbox, FiEdit3, FiLayers, FiMail, FiUsers, FiSettings, FiShield, FiLogOut, FiBell, FiChevronLeft, FiChevronRight, FiUser, FiServer, FiCheckCircle, FiMenu } from 'react-icons/fi'
+import { FiGrid, FiInbox, FiEdit3, FiLayers, FiMail, FiUsers, FiSettings, FiShield, FiLogOut, FiBell, FiChevronLeft, FiChevronRight, FiUser, FiUpload, FiBarChart2, FiCheckCircle, FiMenu } from 'react-icons/fi'
 import { useAuth, ROLE_LABEL } from '../auth'
 import api, { fmt } from '../api'
 import { theme } from '../theme'
@@ -14,7 +14,7 @@ function Hero({ user, right }) {
         <div>
           <div className="text-[18px] font-semibold text-slate-900">{user.full_name}</div>
           <div className="mt-1.5 space-y-0.5 text-slate-500">
-            <p>{org ? org.name : 'VAICS platform operations'}</p>
+            <p>{org ? org.name : 'VAICS'}</p>
             <p>Role: {ROLE_LABEL[user.role] || user.role}</p>
           </div>
         </div>
@@ -25,20 +25,20 @@ function Hero({ user, right }) {
 }
 
 export default function Layout() {
-  const { user, logout, can, isPlatform } = useAuth()
+  const { user, logout, can } = useAuth()
   const nav = useNavigate()
   const [collapsed, setCollapsed] = useState(localStorage.getItem('vs_sidebar') === '1')
   const [mobile, setMobile] = useState(false)
   const [notes, setNotes] = useState([])
   const [open, setOpen] = useState(false)
-  const load = () => { if (!isPlatform) api.get('/org/notifications').then((r) => setNotes(r.data)).catch(() => {}) }
+  const load = () => { api.get('/org/notifications').then((r) => setNotes(r.data)).catch(() => {}) }
   useEffect(() => { load(); const t = setInterval(load, 30000); return () => clearInterval(t) }, []) // eslint-disable-line
   const toggle = () => { setCollapsed(!collapsed); localStorage.setItem('vs_sidebar', collapsed ? '0' : '1') }
   const unread = notes.filter((n) => !n.read).length
-  const groups = isPlatform ? [['VAICS platform', [['/platform', 'Tenants & health', FiServer]]], ['Account', [['/account', 'My account', FiUser]]]] : [
+  const groups = [
     ['VAICS Sign', [['/', 'Dashboard', FiGrid], ['/envelopes', 'Envelopes', FiInbox], can('envelopes.send') && ['/envelopes/new', 'New envelope', FiEdit3],
-      ['/templates', 'Templates', FiLayers], ['/outbox', 'Email outbox', FiMail]]],
-    ['Insights', [['/verify', 'Verify a document', FiCheckCircle]]],
+      ['/templates', 'Templates', FiLayers], can('bulk.send') && ['/bulk', 'Bulk send', FiUpload], ['/outbox', 'Email outbox', FiMail]]],
+    ['Insights', [can('reports.view') && ['/reports', 'Reports', FiBarChart2], ['/verify', 'Verify a document', FiCheckCircle]]],
     ['Administration', [can('users.manage') && ['/admin/users', 'Users & groups', FiUsers], can('settings.manage') && ['/admin/settings', 'Settings & branding', FiSettings],
       (can('audit.view') && user.role !== 'sender') && ['/admin/audit', 'Admin audit log', FiShield],
       can('privacy.manage') && ['/admin/privacy', 'Privacy & retention', FiShield], ['/account', 'My account', FiUser]]],

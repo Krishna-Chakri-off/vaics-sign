@@ -16,7 +16,7 @@ api.interceptors.response.use((r) => { done(r.config); return r }, (err) => {
   if (err.response?.status === 401 && !url.includes('/auth/login') && getToken()) { setToken(null); if (!location.pathname.startsWith('/login')) location.href = '/login?expired=1' }
   return Promise.reject(err)
 })
-// public (signer / powerform / verify) calls never carry the user token
+// public (signer / verify) calls never carry the user token
 export const pub = axios.create({ baseURL: API_URL })
 pub.interceptors.request.use(track)
 pub.interceptors.response.use((r) => { done(r.config); return r }, (e) => { done(e.config); return Promise.reject(e) })

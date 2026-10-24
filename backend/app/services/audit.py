@@ -24,11 +24,6 @@ def record(db, env, event: str, actor: str, req=None, detail: str = "", recipien
                    created_at=now())
     e.entry_hash = entry_hash(e)
     db.add(e); db.flush()
-    try:
-        from .webhooks import emit
-        emit(db, env.org_id, f"envelope.{event}", {"envelope_id": env.public_id, "event": event, "actor": actor, "at": e.created_at.isoformat() + "Z"})
-    except Exception:
-        pass
     return e
 
 

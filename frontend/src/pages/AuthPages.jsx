@@ -57,34 +57,6 @@ export function Login() {
 
 const COUNTRIES = [['IN', 'India'], ['US', 'United States'], ['GB', 'United Kingdom'], ['DE', 'Germany'], ['FR', 'France'], ['NL', 'Netherlands'], ['IE', 'Ireland'], ['AE', 'United Arab Emirates'], ['SG', 'Singapore'], ['AU', 'Australia'], ['CA', 'Canada']]
 
-export function Signup() {
-  const [f, setF] = useState({ full_name: '', email: '', password: '', organization: '', country: 'IN', accept_terms: false, sandbox: false })
-  const [err, setErr] = useState(''); const [done, setDone] = useState(null); const [busy, setBusy] = useState(false)
-  const submit = async (e) => { e.preventDefault(); setErr(''); setBusy(true); try { const r = await api.post('/auth/signup', f); setDone(r.data) } catch (ex) { setErr(errMsg(ex)) } finally { setBusy(false) } }
-  if (done) return (
-    <AuthCard title="Check your email">
-      <Alert kind="ok">Your organization was created (data region: {done.region.toUpperCase()}). Verify your email address to start sending.</Alert>
-      {done.email_mode === 'dev_outbox' && <Alert kind="warn">SMTP is not configured: no email was delivered. Sign in and open the Email outbox to find the verification link.</Alert>}
-      <Link className="btn-primary w-full" to="/login">Go to sign in</Link>
-    </AuthCard>)
-  return (
-    <AuthCard title="Create your organization" subtitle="14-day free trial of the Business plan. No card required.">
-      <Alert>{err}</Alert>
-      <form onSubmit={submit} className="space-y-3">
-        <Field label="Your full name"><input className="input" value={f.full_name} onChange={(e) => setF({ ...f, full_name: e.target.value })} required /></Field>
-        <Field label="Work email"><input className="input" type="email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} required /></Field>
-        <Field label="Password (12+ characters, mixed case, a number and a symbol)"><input className="input" type="password" autoComplete="new-password" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} required /></Field>
-        <Field label="Organization name"><input className="input" value={f.organization} onChange={(e) => setF({ ...f, organization: e.target.value })} required /></Field>
-        <Field label="Country (sets your data region and currency)"><select className="input" value={f.country} onChange={(e) => setF({ ...f, country: e.target.value })}>{COUNTRIES.map(([c, n]) => <option key={c} value={c}>{n}</option>)}</select></Field>
-        <label className="flex gap-2"><input type="checkbox" checked={f.sandbox} onChange={(e) => setF({ ...f, sandbox: e.target.checked })} /> Developer sandbox (watermarked test documents, not legally binding)</label>
-        <label className="flex gap-2"><input type="checkbox" checked={f.accept_terms} onChange={(e) => setF({ ...f, accept_terms: e.target.checked })} required /> I accept the Terms of Service, Privacy Policy and Data Processing Agreement.</label>
-        <button className="btn-accent w-full" disabled={busy}>Create organization</button>
-      </form>
-      <Link className="text-[#0D47A1]" to="/login">Already have an account? Sign in</Link>
-    </AuthCard>
-  )
-}
-
 export function VerifyEmail() {
   const { token } = useParams(); const [s, setS] = useState({ ok: '', err: '' })
   useEffect(() => { api.post(`/auth/verify-email/${token}`).then(() => setS({ ok: 'Your email address is verified. You can now send documents.' })).catch((e) => setS({ err: errMsg(e) })) }, [token])

@@ -1,15 +1,25 @@
-"""Phase 1 (internal VAICS) mode: SaaS surfaces off, signer intent required, self-service privacy requests."""
-from app.core.config import settings
+"""Phase 1 (internal VAICS): no SaaS surfaces, signer intent required, self-service privacy requests."""
 from .conftest import signup, login, draft, link_and_code, outbox, PW
 
 
-def test_saas_surfaces_disabled(client, monkeypatch):
+def test_saas_surfaces_removed(client):
     h = signup(client)
-    monkeypatch.setattr(settings, "SAAS_MODE", False)
     r = client.post("/api/v1/auth/signup", json={"full_name": "Xavier Yu", "email": "x@example.com", "password": PW, "organization": "Org", "country": "IN", "accept_terms": True})
-    assert r.status_code == 404
-    assert client.get("/api/v1/billing/subscription", headers=h).status_code == 404
+    assert r.status_code in (404, 405)
+    for path in ("/api/v1/billing/subscription", "/api/v1/platform/tenants", "/api/v1/org/api-keys", "/api/v1/org/webhooks", "/api/v1/powerforms", "/api/v1/org/usage"):
+        assert client.get(path, headers=h).status_code == 404, path
+    me = client.get("/api/v1/auth/me", headers=h).json()
+    assert "plan" not in str(me.get("org", {})) and "features" not in (me.get("org") or {})
     assert client.get("/api/v1/envelopes/dashboard", headers=h).status_code == 200
+
+
+def test_in_person_signing_always_available(client):
+    h = signup(client)
+    me = client.get("/api/v1/auth/me", headers=h).json()
+    e = client.post("/api/v1/envelopes", json={"title": "In person"}, headers=h).json()
+    r = client.put(f"/api/v1/envelopes/{e['id']}", json={"recipients": [{"name": "Walk In", "email": "walkin@example.com", "type": "in_person", "order": 1, "host_user_id": me["id"]}]}, headers=h)
+    assert r.status_code == 200, r.text
+    assert "plan" not in r.text.lower()
 
 
 def test_intent_required_and_audited(client):

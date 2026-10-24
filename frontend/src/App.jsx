@@ -7,12 +7,12 @@ import Envelopes from './pages/Envelopes'
 import EnvelopeDetail, { EnvelopeNew } from './pages/EnvelopeDetail'
 import SignPortal from './pages/SignPortal'
 import { CompletedAccess, VerifyPage, PrivacyNotice } from './pages/PublicPages'
-import Templates, { Outbox } from './pages/Templates'
+import Templates, { Outbox, Bulk, Reports } from './pages/Templates'
 import { UsersGroups, SettingsBranding, AdminAudit, Privacy } from './pages/Admin'
 import Account from './pages/Account'
 import { FeedbackHost } from './components/ui'
 
-// Phase 1: internal VAICS tool. SaaS surfaces (sign-up, billing, platform console, API/webhooks, PowerForms, bulk) are not routed.
+// Internal VAICS tool: single VAICS organisation, invitation-only accounts, everything available to VAICS users.
 function Private({ children }) {
   const { user, loading } = useAuth(); const loc = useLocation()
   if (loading) return <div className="p-10 text-slate-400">Loading…</div>
@@ -41,7 +41,9 @@ export default function App() {
         <Route path="/envelopes/new" element={<EnvelopeNew />} />
         <Route path="/envelopes/:id" element={<EnvelopeDetail />} />
         <Route path="/templates" element={<Templates />} />
+        <Route path="/bulk" element={<Bulk />} />
         <Route path="/outbox" element={<Outbox />} />
+        <Route path="/reports" element={<Reports />} />
         <Route path="/admin/users" element={<UsersGroups />} />
         <Route path="/admin/settings" element={<SettingsBranding />} />
         <Route path="/admin/audit" element={<AdminAudit />} />

@@ -42,13 +42,6 @@ class _Window:
 limiter = _Window()
 
 
-def plan_api_limit(org) -> int:
-    try:
-        return int((org.plan.limits or {}).get("api_calls_per_min", 60))
-    except Exception:
-        return 60
-
-
 class RateLimit(BaseHTTPMiddleware):
     async def dispatch(self, request, call_next):
         if not settings.RATE_LIMIT_ENABLED:
@@ -60,19 +53,6 @@ class RateLimit(BaseHTTPMiddleware):
             rule = (f"auth:{ip}", settings.RATE_LIMIT_AUTH_PER_MIN)
         elif path.startswith(("/api/v1/public/", "/api/v1/verify")):
             rule = (f"pub:{ip}", settings.RATE_LIMIT_PUBLIC_PER_MIN)
-        key = request.headers.get("x-api-key") or ""
-        auth = request.headers.get("authorization", "")
-        if not key and auth.lower().startswith("bearer vsk_"):
-            key = auth[7:]
-        if key:
-            from .db import SessionLocal
-            from ..models import ApiKey, Organization
-            from .security import sha256_hex
-            with SessionLocal() as db:
-                k = db.query(ApiKey).filter_by(key_hash=sha256_hex(key), revoked=False).first()
-                if k:
-                    org = db.get(Organization, k.org_id)
-                    rule = (f"org:{k.org_id}", plan_api_limit(org))
         if not rule:
             return await call_next(request)
         ok, remaining, reset = limiter.hit(*rule)

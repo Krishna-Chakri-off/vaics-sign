@@ -66,7 +66,7 @@ export const STATUS = {
   created: ['Waiting', 'border-slate-300 text-slate-600'], authenticated: ['Authenticated', 'border-sky-200 bg-sky-50 text-sky-700'],
   pending: ['Pending', 'border-slate-300 text-slate-600'], validated: ['Validated', 'border-sky-200 bg-sky-50 text-sky-700'], done: ['Done', 'border-green-200 bg-green-50 text-green-800'],
   delivered_wh: ['Delivered', 'border-green-200 bg-green-50 text-green-800'], retrying: ['Retrying', 'border-amber-200 bg-amber-50 text-amber-800'], failed: ['Failed', 'border-red-200 bg-red-50 text-red-700'],
-  open: ['Open', 'border-amber-200 bg-amber-50 text-amber-800'], paid: ['Paid', 'border-green-200 bg-green-50 text-green-800'], trial: ['Trial', 'border-sky-200 bg-sky-50 text-sky-700'],
+  open: ['Open', 'border-amber-200 bg-amber-50 text-amber-800'],
   active: ['Active', 'border-green-200 bg-green-50 text-green-800'], past_due: ['Past due', 'border-red-200 bg-red-50 text-red-700'], restricted: ['Restricted', 'border-red-200 bg-red-50 text-red-700'],
   suspended: ['Suspended', 'border-red-200 bg-red-50 text-red-700'], closed: ['Closed', 'border-slate-300 bg-slate-100 text-slate-600'], dev_outbox: ['Dev outbox (not sent)', 'border-amber-200 bg-amber-50 text-amber-800'],
   accepted: ['Accepted by SMTP', 'border-green-200 bg-green-50 text-green-800'],
