@@ -34,19 +34,19 @@ export default function EnvelopeEditor({ env, reload }) {
   useEffect(() => { if (!doc && env.documents[0]) setDoc(env.documents[0].id) }, [env.documents]) // eslint-disable-line
   useEffect(() => { setBuf(null); if (doc) fetchBuf(`/envelopes/${env.id}/documents/${doc}/file`).then(setBuf).catch((e) => setErr(errMsg(e))) }, [doc, env.id])
 
-  const payload = () => ({
+  const payload = (quietDraft = false) => ({
     title, message, labels: labels.split(',').map((s) => s.trim()).filter(Boolean), expires_at: expires ? `${expires}T23:59:00` : null,
     reminder_first_days: +rem.first, reminder_every_days: +rem.every,
-    recipients: rs.map((r, i) => ({ client_id: String(i), name: r.name, email: r.email, phone: r.phone || null, order: +r.order || 1, type: r.type, role_name: r.role_name || null,
+    recipients: rs.map((r, i) => ({ r, i })).filter(({ r }) => !quietDraft || (r.name || '').trim() || (r.email || '').trim()).map(({ r, i }) => ({ client_id: String(i), name: r.name, email: r.email, phone: r.phone || null, order: +r.order || 1, type: r.type, role_name: r.role_name || null,
       auth_method: r.type === 'in_person' ? 'none' : r.auth_method, access_code: r.access_code || null, host_user_id: r.host_user_id || null, private_message: r.private_message || '', language: r.language || 'en', signature_type: r.signature_type || 'electronic' })),
     fields: fs.filter((f) => f.ri >= 0 && f.ri < rs.length).map((f) => ({ recipient: String(f.ri), document_id: f.document_id, type: f.type, page: f.page, x: f.x, y: f.y, w: f.w, h: f.h,
       required: f.required ?? true, reason_required: f.reason_required ?? true, label: f.label || null, options: f.options || [], validation: f.validation || null, default_value: f.default_value || null,
       read_only: !!f.read_only, formula: f.formula || null, group_name: f.group_name || null, tooltip: f.tooltip || null, condition: f.condition || {} })),
   })
-  const save = async (quiet) => { setErr(''); setErrs([]); setOk(''); try { await api.put(`/envelopes/${env.id}`, payload()); if (!quiet) { setOk('Draft saved'); reload() } return true } catch (e) { setErr(errMsg(e)); return false } }
+  const save = async (quiet) => { setErr(''); setErrs([]); setOk(''); try { await api.put(`/envelopes/${env.id}`, payload(!!quiet && quiet !== 'send')); if (!quiet) { setOk('Draft saved'); reload() } return true } catch (e) { setErr(errMsg(e)); return false } }
   const send = async () => {
     setConfirmSend(false); setBusy(true)
-    if (!(await save(true))) { setBusy(false); return }
+    if (!(await save('send'))) { setBusy(false); return }
     try {
       const r = await api.post(`/envelopes/${env.id}/send`)
       reload(r.data.email_mode === 'smtp' ? 'Sent. The first recipient(s) were emailed a link and, separately, an access code (accepted by the SMTP relay; delivery is not guaranteed).'
@@ -55,7 +55,7 @@ export default function EnvelopeEditor({ env, reload }) {
   }
   const upload = async (files) => {
     setErr(''); setBusy(true)
-    try { for (const f of files) { const fd = new FormData(); fd.append('file', f); await api.post(`/envelopes/${env.id}/documents`, fd) } await save(true); reload() } catch (e) { setErr(errMsg(e)) } finally { setBusy(false) }
+    try { for (const f of files) { if (!/\.pdf$/i.test(f.name)) throw new Error(`${f.name} is not a PDF. Only PDF files can be uploaded.`); const fd = new FormData(); fd.append('file', f); await api.post(`/envelopes/${env.id}/documents`, fd) } await save(true); reload() } catch (e) { setErr(errMsg(e)) } finally { setBusy(false) }
   }
   const removeDoc = async (id) => { if (!await ask('Remove this document and its fields?')) return; try { setFs(fs.filter((f) => f.document_id !== id)); await api.delete(`/envelopes/${env.id}/documents/${id}`); if (doc === id) setDoc(null); reload() } catch (e) { setErr(errMsg(e)) } }
   const moveDoc = async (i, dir) => { const ids = env.documents.map((d) => d.id); const j = i + dir; if (j < 0 || j >= ids.length) return; [ids[i], ids[j]] = [ids[j], ids[i]]; await api.post(`/envelopes/${env.id}/documents/reorder`, { document_ids: ids }); reload() }
@@ -112,7 +112,7 @@ export default function EnvelopeEditor({ env, reload }) {
                 <button className="btn-secondary !min-h-0 !px-1.5 !py-0" onClick={() => moveDoc(i, -1)}>↑</button><button className="btn-secondary !min-h-0 !px-1.5 !py-0" onClick={() => moveDoc(i, 1)}>↓</button>
                 <button className="btn-secondary !min-h-0 !px-1.5 !py-0" onClick={() => removeDoc(d.id)}>✕</button>
               </div>))}
-            <label className="btn-secondary w-full cursor-pointer">{busy ? 'Working…' : '+ Add documents (PDF, Word, Excel, PowerPoint, images)'}<input type="file" multiple hidden accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.rtf,.txt,.png,.jpg,.jpeg" onChange={(e) => upload([...e.target.files])} /></label>
+            <label className="btn-secondary w-full cursor-pointer">{busy ? 'Working…' : '+ Add PDF documents'}<input type="file" multiple hidden accept="application/pdf,.pdf" onChange={(e) => upload([...e.target.files])} /></label>
           </div>
           <div className="card space-y-2">
             <div className="flex items-center justify-between"><h2>2 · Recipients</h2><span className="text-slate-500">{parallel ? 'Parallel steps in use' : 'Strict order'}</span></div>

@@ -31,7 +31,6 @@ Source of truth: `backend/app/core/config.py` (Settings). `backend/.env.example`
 | `MAX_DOC_MB` | `25` |  |
 | `MAX_ENVELOPE_MB` | `100` |  |
 | `MAX_DOCS_PER_ENVELOPE` | `50` |  |
-| `SOFFICE_PATH` | `soffice` |  |
 | `CLAMD_HOST` | `` |  |
 | `CLAMD_PORT` | `3310` |  |
 | `STORAGE_BACKEND` | `local` |  |

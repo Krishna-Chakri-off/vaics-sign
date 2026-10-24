@@ -40,7 +40,6 @@ class Settings(BaseSettings):
     MAX_DOC_MB: int = 25
     MAX_ENVELOPE_MB: int = 100
     MAX_DOCS_PER_ENVELOPE: int = 50
-    SOFFICE_PATH: str = "soffice"  # LibreOffice for Word/Excel/PowerPoint/text/image -> PDF
     CLAMD_HOST: str = ""  # malware scanning via clamd; empty = not configured
     CLAMD_PORT: int = 3310
 

@@ -57,7 +57,7 @@ Summary (before the SaaS scope was removed): Partial: 48, Done: 97, Not implemen
 | FR-045 | Editable email templates | Must | R2 | Partial | Fixed templates with branding; per-language editor not done |
 | FR-046 | Custom legal text | Must | R1 | Partial | Custom disclosure text in settings |
 | FR-047 | Full white-label for partners | Should | R4 | Not implemented |  |
-| FR-048 | Supported formats | Must | R1 | Partial | PDF + images; Office via LibreOffice only if installed (optional in Docker) |
+| FR-048 | Supported formats | Must | R1 | Partial | PDF only (by design) |
 | FR-049 | Upload sources | Must | R1 | Partial | Computer/drag-drop/templates; cloud pickers not done |
 | FR-050 | File limits | Must | R1 | Done |  |
 | FR-051 | Validation and malware scan | Must | R1 | Partial | Type/integrity checks; ClamAV only if CLAMD_HOST set |

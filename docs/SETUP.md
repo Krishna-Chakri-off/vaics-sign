@@ -1,6 +1,6 @@
 # Setup
 ## Requirements
-Python 3.12+, Node 20+, PostgreSQL 15+ (SQLite works for dev/tests). Optional: LibreOffice (Office→PDF; set `SOFFICE_PATH` to the full `soffice` path if it is not on PATH — on Windows the default install folder is found automatically), ClamAV, S3/MinIO.
+Python 3.12+, Node 20+, PostgreSQL 15+ (SQLite works for dev/tests). Optional: ClamAV, S3/MinIO.
 ## Backend
 1. `cd backend && pip install -r requirements.txt`
 2. `cp .env.example .env`, then set `SECRET_KEY` (the app refuses to start in `ENV=production` with a weak or default key), `DATABASE_URL=postgresql+psycopg2://user:pass@host/db` and `AUTO_CREATE_TABLES=false`.
