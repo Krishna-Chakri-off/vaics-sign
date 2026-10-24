@@ -19,7 +19,7 @@ export default function EnvelopeEditor({ env, reload }) {
   const { user } = useAuth()
   const [title, setTitle] = useState(env.title); const [message, setMessage] = useState(env.message || '')
   const [rs, setRs] = useState(env.recipients.length ? env.recipients.map((r) => ({ ...r, access_code: '' })) : [
-    { name: user.full_name, email: user.email, order: 1, type: 'signer', auth_method: 'access_code', role_name: 'VAICS representative' },
+    { name: '', email: '', order: 1, type: 'signer', auth_method: 'access_code', role_name: 'VAICS representative' },
     { name: '', email: '', order: 2, type: 'signer', auth_method: 'access_code', role_name: 'Countersigner' }])
   const [fs, setFs] = useState(env.fields.map((f) => ({ ...f, ri: env.recipients.findIndex((r) => r.id === f.recipient_id) })))
   const [expires, setExpires] = useState(env.expires_at ? env.expires_at.slice(0, 10) : '')
