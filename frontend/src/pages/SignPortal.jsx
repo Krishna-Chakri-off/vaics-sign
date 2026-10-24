@@ -130,17 +130,17 @@ export default function SignPortal() {
       <div className="flex justify-end gap-2">{!kiosk && <select className="input !w-auto" value={getLang()} onChange={(e) => { setLang(e.target.value); force((x) => x + 1) }} aria-label={t('language')}>{LANGS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>}</div>
       {info?.is_sandbox && <Alert kind="warn">SANDBOX envelope — for testing only, not legally binding.</Alert>}
       <Alert>{err}</Alert>
-      {done ? <div className="card mx-auto max-w-lg space-y-4 p-10 text-center"><span className="round mx-auto flex h-14 w-14 items-center justify-center bg-green-50 text-[26px] text-green-700">✓</span><p className="text-[16px] font-medium">{done}</p>{kiosk && <button className="btn-primary" onClick={() => nav('/envelopes')}>Return the device to the host</button>}</div>
+      {done ? <div className="card space-y-3 text-base font-medium text-green-800"><p>{done}</p>{kiosk && <button className="btn-primary" onClick={() => nav('/envelopes')}>Return the device to the host</button>}</div>
         : !sess ? info && (
-          <div className="card mx-auto max-w-md space-y-5 p-10">
-            <div><div className="eyebrow mb-1">Document for signature</div><h1>{info.title}</h1></div>
-            <p className="muted">{info.sender} ({info.sender_email}) sent you a document. Hello {info.recipient.name} (step {info.recipient.order}).</p>
+          <div className="card mx-auto max-w-md space-y-3">
+            <h1>{info.title}</h1>
+            <p className="text-slate-500">{info.sender} ({info.sender_email}) sent you a document. Hello {info.recipient.name} (step {info.recipient.order}).</p>
             {info.recipient.locked ? <Alert>Too many incorrect codes. The sender has been alerted and must reissue your access.</Alert>
               : info.recipient.auth_method === 'none' ? <button className="btn-primary w-full" onClick={openNoCode}>Continue</button>
                 : <form onSubmit={unlock} className="space-y-3">
                   {info.recipient.auth_method === 'access_code' ? <p>{t('enterCode')}</p> : <><button type="button" className="btn-secondary w-full" onClick={sendOtp}>{info.recipient.auth_method === 'sms_otp' ? t('sendSms') : t('sendCode')}</button>{otpSent && <Alert kind="ok">{otpSent}</Alert>}</>}
-                  <input className="input h-14 text-center !text-[24px] tracking-[0.5em]" inputMode="numeric" autoComplete="one-time-code" maxLength={8} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} placeholder="••••••" autoFocus aria-label="Code" />
-                  <button className="btn-primary h-11 w-full" disabled={busy || code.length < 6}>{t('unlock')}</button>
+                  <input className="input text-center text-xl tracking-[0.4em]" inputMode="numeric" autoComplete="one-time-code" maxLength={8} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} placeholder="••••••" autoFocus aria-label="Code" />
+                  <button className="btn-primary w-full" disabled={busy || code.length < 6}>{t('unlock')}</button>
                 </form>}
             <details className="text-slate-500"><summary className="cursor-pointer">Privacy notice</summary><p className="mt-1 whitespace-pre-line">{info.privacy_text}</p></details>
           </div>)

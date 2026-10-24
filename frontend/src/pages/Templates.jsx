@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api, { errMsg, fmt, download } from '../api'
 import { useAuth } from '../auth'
-import { PageShell, Table, Alert, Modal, Field, SBadge, useAsync } from '../components/ui'
+import { PageShell, Table, Alert, Modal, Field, SBadge, useAsync , ask } from '../components/ui'
 
 export default function Templates() {
   const nav = useNavigate(); const { can, feature } = useAuth()
@@ -25,7 +25,7 @@ export default function Templates() {
         { label: '', render: (t) => <div className="flex gap-1"><button className="btn-accent" onClick={() => setUse(t)}>Use</button>
           {can('bulk.send') && <button className="btn-secondary" onClick={() => nav(`/bulk?template=${t.id}`)}>Bulk</button>}
           {can('templates.share') && <button className="btn-secondary" onClick={async () => { const name = prompt('PowerForm name', t.name); if (!name) return; try { const r = await api.post('/powerforms', { template_id: t.id, name }); setMsg(`PowerForm created: ${r.data.url}`) } catch (e) { setE2(errMsg(e)) } }}>PowerForm</button>}
-          {can('templates.share') && <button className="btn-secondary" onClick={async () => { if (confirm('Archive this template?')) { await api.put(`/templates/${t.id}`, { archived: true }); reload() } }}>Archive</button>}</div> },
+          {can('templates.share') && <button className="btn-secondary" onClick={async () => { if (await ask('Archive this template?')) { await api.put(`/templates/${t.id}`, { archived: true }); reload() } }}>Archive</button>}</div> },
       ]} />
       {use && <UseModal t={use} onClose={() => setUse(null)} onDone={(env) => nav(`/envelopes/${env.id}`)} />}
     </PageShell>)

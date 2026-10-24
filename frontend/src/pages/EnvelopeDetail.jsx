@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import api, { errMsg, fmt, fmtIST, download, openBlob, fetchBuf } from '../api'
 import { useAuth } from '../auth'
-import { PageShell, Alert, Table, SBadge, Section, Modal, Field, COLORS, Tabs } from '../components/ui'
+import { PageShell, Alert, Table, SBadge, Section, Modal, Field, COLORS, Tabs , ask } from '../components/ui'
 import PdfPages from '../components/PdfPages'
 import EnvelopeEditor from './EnvelopeEditor'
 
@@ -10,15 +10,13 @@ export function EnvelopeNew() {
   const nav = useNavigate(); const [title, setTitle] = useState('Consulting Agreement'); const [err, setErr] = useState('')
   const create = async (e) => { e.preventDefault(); try { const r = await api.post('/envelopes', { title }); nav(`/envelopes/${r.data.id}`) } catch (ex) { setErr(errMsg(ex)) } }
   return (
-    <div className="mx-auto max-w-2xl space-y-8 pt-4">
-      <div className="text-center"><div className="eyebrow mb-1">New document</div><h1>What are you sending for signature?</h1><p className="muted mt-2">Give it a name. Next you'll upload the PDF, add signers in order and place their fields.</p></div>
+    <PageShell title="New envelope" subtitle="Upload documents, add recipients in order, place fields, then Generate." right={<Link className="btn-secondary" to="/templates">Start from a template</Link>}>
       <Alert>{err}</Alert>
-      <form onSubmit={create} className="card space-y-5 p-8">
-        <Field label="Document title"><input className="input h-12 !text-[16px]" value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus /></Field>
-        <ol className="grid gap-3 sm:grid-cols-4">{['Upload PDF', 'Add signers', 'Place fields', 'Review & send'].map((x, i) => <li key={x} className="border-t-2 border-[#D6E8FF] pt-2 text-[13px] text-slate-500 first:border-[#0D47A1] first:text-[#0D47A1]"><b className="block text-[12px]">Step {i + 1}</b>{x}</li>)}</ol>
-        <div className="flex items-center justify-between gap-3 border-t border-gray-100 pt-5"><Link className="text-[13px] text-[#0D47A1] hover:underline" to="/templates">or start from a template</Link><button className="btn-primary">Continue</button></div>
+      <form onSubmit={create} className="card max-w-xl space-y-3">
+        <Field label="Title"><input className="input" value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus /></Field>
+        <button className="btn-accent">Create draft</button>
       </form>
-    </div>)
+    </PageShell>)
 }
 
 export default function EnvelopeDetail() {
@@ -36,7 +34,7 @@ export default function EnvelopeDetail() {
   const header = (
     <span>{env.public_id} · sender {env.owner?.name} · <SBadge s={env.status} />{env.is_sandbox && <b className="ml-2 text-[#E6007E]">SANDBOX — not legally binding</b>}{env.legal_hold && <b className="ml-2 text-red-700">LEGAL HOLD</b>}</span>)
   if (env.status === 'draft') return (
-    <PageShell title={env.title} subtitle={header} right={<><Link className="btn-secondary" to="/outbox">Email outbox</Link><button className="btn-danger" onClick={() => confirm('Delete this draft?') && act(() => api.delete(`/envelopes/${id}`), 'Deleted').then((ok2) => ok2 && nav('/envelopes'))}>Delete draft</button></>}>
+    <PageShell title={env.title} subtitle={header} right={<><Link className="btn-secondary" to="/outbox">Email outbox</Link><button className="btn-danger" onClick={async () => await ask('Delete this draft?') && act(() => api.delete(`/envelopes/${id}`), 'Deleted').then((ok2) => ok2 && nav('/envelopes'))}>Delete draft</button></>}>
       <EnvelopeEditor env={env} reload={load} />
     </PageShell>)
   const fieldsOf = (rid) => env.fields.filter((f) => f.recipient_id === rid)
@@ -56,7 +54,7 @@ export default function EnvelopeDetail() {
       {can('envelopes.send') && <button className="btn-secondary" onClick={() => api.post(`/envelopes/${id}/duplicate`).then((r) => nav(`/envelopes/${r.data.id}`)).catch((e) => setErr(errMsg(e)))}>Duplicate</button>}
       {can('templates.create') && <button className="btn-secondary" onClick={() => setModal('template')}>Save as template</button>}
       {can('privacy.manage') && <button className="btn-secondary" onClick={() => act(() => api.post(`/envelopes/${id}/legal-hold`, { hold: !env.legal_hold }), env.legal_hold ? 'Legal hold removed' : 'Legal hold applied')}>{env.legal_hold ? 'Release hold' : 'Legal hold'}</button>}
-      {!open && mine && !env.legal_hold && <button className="btn-danger" onClick={() => confirm('Delete this envelope? Documents are purged; the audit evidence is kept.') && act(() => api.delete(`/envelopes/${id}`), 'Deleted').then((ok2) => ok2 && nav('/envelopes'))}>Delete</button>}
+      {!open && mine && !env.legal_hold && <button className="btn-danger" onClick={async () => await ask('Delete this envelope? Documents are purged; the audit evidence is kept.') && act(() => api.delete(`/envelopes/${id}`), 'Deleted').then((ok2) => ok2 && nav('/envelopes'))}>Delete</button>}
     </>}>
       <Alert>{err}</Alert><Alert kind="ok">{ok}</Alert>
       {env.status === 'voided' && <Alert kind="warn">Voided: {env.void_reason}</Alert>}

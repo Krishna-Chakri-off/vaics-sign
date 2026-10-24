@@ -5,14 +5,21 @@ const TOKEN = 'vs_token'
 export const getToken = () => localStorage.getItem(TOKEN)
 export const setToken = (t) => (t ? localStorage.setItem(TOKEN, t) : localStorage.removeItem(TOKEN))
 const api = axios.create({ baseURL: API_URL })
-api.interceptors.request.use((cfg) => { const t = getToken(); if (t) cfg.headers.Authorization = `Bearer ${t}`; return cfg })
-api.interceptors.response.use((r) => r, (err) => {
+// interaction feedback: the button that triggered a request shows a spinner and is blocked until it finishes
+const busy = (cfg, on) => { const b = on ? (document.activeElement?.closest?.('button') || null) : cfg._btn; if (!b) return; if (on) { cfg._btn = b; b.classList.add('is-loading'); b.setAttribute('aria-busy', 'true') } else { b.classList.remove('is-loading'); b.removeAttribute('aria-busy') } }
+const track = (cfg) => { if (typeof document !== 'undefined' && cfg.method && cfg.method !== 'get') busy(cfg, true); return cfg }
+const done = (cfg) => cfg && busy(cfg, false)
+api.interceptors.request.use((cfg) => { const t = getToken(); if (t) cfg.headers.Authorization = `Bearer ${t}`; return track(cfg) })
+api.interceptors.response.use((r) => { done(r.config); return r }, (err) => {
+  done(err.config)
   const url = err.config?.url || ''
   if (err.response?.status === 401 && !url.includes('/auth/login') && getToken()) { setToken(null); if (!location.pathname.startsWith('/login')) location.href = '/login?expired=1' }
   return Promise.reject(err)
 })
 // public (signer / powerform / verify) calls never carry the user token
 export const pub = axios.create({ baseURL: API_URL })
+pub.interceptors.request.use(track)
+pub.interceptors.response.use((r) => { done(r.config); return r }, (e) => { done(e.config); return Promise.reject(e) })
 
 export const errMsg = (e) => {
   const d = e?.response?.data?.detail

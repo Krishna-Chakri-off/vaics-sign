@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import api, { errMsg, fetchBuf } from '../api'
 import { useAuth } from '../auth'
-import { Alert, Field, COLORS, Modal } from '../components/ui'
+import { Alert, Field, COLORS, Modal , ask } from '../components/ui'
 import PdfPages from '../components/PdfPages'
 
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v))
@@ -57,7 +57,7 @@ export default function EnvelopeEditor({ env, reload }) {
     setErr(''); setBusy(true)
     try { for (const f of files) { const fd = new FormData(); fd.append('file', f); await api.post(`/envelopes/${env.id}/documents`, fd) } await save(true); reload() } catch (e) { setErr(errMsg(e)) } finally { setBusy(false) }
   }
-  const removeDoc = async (id) => { if (!confirm('Remove this document and its fields?')) return; try { setFs(fs.filter((f) => f.document_id !== id)); await api.delete(`/envelopes/${env.id}/documents/${id}`); if (doc === id) setDoc(null); reload() } catch (e) { setErr(errMsg(e)) } }
+  const removeDoc = async (id) => { if (!await ask('Remove this document and its fields?')) return; try { setFs(fs.filter((f) => f.document_id !== id)); await api.delete(`/envelopes/${env.id}/documents/${id}`); if (doc === id) setDoc(null); reload() } catch (e) { setErr(errMsg(e)) } }
   const moveDoc = async (i, dir) => { const ids = env.documents.map((d) => d.id); const j = i + dir; if (j < 0 || j >= ids.length) return; [ids[i], ids[j]] = [ids[j], ids[i]]; await api.post(`/envelopes/${env.id}/documents/reorder`, { document_ids: ids }); reload() }
   const setR = (i, k, v) => setRs(rs.map((r, j) => (j === i ? { ...r, [k]: v } : r)))
   const removeR = (i) => { setRs(rs.filter((_, j) => j !== i)); setFs(fs.filter((f) => f.ri !== i).map((f) => ({ ...f, ri: f.ri > i ? f.ri - 1 : f.ri }))); setActive(0) }

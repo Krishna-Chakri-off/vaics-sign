@@ -20,7 +20,7 @@ export default function Envelopes() {
     try { const r = await api.post('/envelopes-bulk-action', { envelope_ids: sel, action, reason }); setMsg(`${r.data.done} envelope(s) processed${r.data.errors.length ? `, ${r.data.errors.length} skipped` : ''}`); setSel([]); load() } catch (e) { setErr(errMsg(e)) }
   }
   return (
-    <PageShell title="Documents" subtitle={`${data.total} document${data.total === 1 ? '' : 's'}`} right={can('envelopes.send') && <Link className="btn-primary" to="/envelopes/new">+ New document</Link>}>
+    <PageShell title="Envelopes" subtitle={`${data.total} envelope(s)`} right={can('envelopes.send') && <Link className="btn-accent" to="/envelopes/new">+ New envelope</Link>}>
       <Tabs value={box} onChange={(v) => set('box', v === 'all' ? '' : v)} tabs={[['all', 'All I can see'], ['mine', 'Sent by me'], ['waiting_for_me', 'Waiting for me'], ['shared', 'Shared with my groups']]} />
       <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
         <input id="list-search" className="input lg:col-span-2" placeholder="Search title, ID, recipient, document text…" defaultValue={q.q || ''} onKeyDown={(e) => e.key === 'Enter' && set('q', e.target.value)} />

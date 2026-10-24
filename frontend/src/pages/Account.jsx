@@ -3,7 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import api, { errMsg, fmt, download } from '../api'
 import { useAuth, ROLE_LABEL } from '../auth'
 import { LANGS, setLang } from '../i18n'
-import { PageShell, Section, Alert, Field, Table, useAsync } from '../components/ui'
+import { PageShell, Section, Alert, Field, Table, useAsync , ask } from '../components/ui'
 
 export default function Account() {
   const { user, refresh } = useAuth(); const [q] = useSearchParams()
@@ -40,10 +40,10 @@ export default function Account() {
                 : <button className="btn-accent" onClick={async () => { const r = await run(() => api.post('/auth/mfa/setup'), ''); if (r) setMfa(r.data) }}>Set up MFA</button>}
         </Section>
         <Section title="My data" right={<div className="flex gap-2"><button className="btn-secondary" onClick={() => run(() => api.post('/privacy/my-requests', { kind: 'export' }), 'Export requested. An administrator will review it.').then(reqs.reload)}>Request a copy</button>
-          <button className="btn-danger" onClick={() => { if (confirm('Request deletion of your personal data? An administrator reviews it; completed signed records are kept where the law requires, and your account will be deactivated.')) run(() => api.post('/privacy/my-requests', { kind: 'erase' }), 'Deletion requested. An administrator will review it.').then(reqs.reload) }}>Request deletion</button></div>}>
-          <p className="muted">Ask for a copy of the personal data VAICS Sign holds about you, or for its deletion. Requests are approved by an administrator and recorded in the admin audit log.</p>
+          <button className="btn-danger" onClick={async () => { if (await ask('Request deletion of your personal data? An administrator reviews it; completed signed records are kept where the law requires, and your account will be deactivated.')) run(() => api.post('/privacy/my-requests', { kind: 'erase' }), 'Deletion requested. An administrator will review it.').then(reqs.reload) }}>Request deletion</button></div>}>
+          <p className="text-slate-500">Ask for a copy of the personal data VAICS Sign holds about you, or for its deletion. Requests are approved by an administrator and recorded in the admin audit log.</p>
           <Table rows={reqs.data || []} empty="No requests yet." cols={[{ label: 'Requested', render: (r) => fmt(r.created_at) }, { label: 'Type', render: (r) => r.kind === 'self_export' ? 'Copy of my data' : 'Deletion' },
-            { label: 'Status', render: (r) => <span className="capitalize">{r.status}</span> }, { label: '', render: (r) => r.kind === 'self_export' && r.status === 'completed' && <button className="btn-ghost" onClick={() => download(`/privacy/my-requests/${r.id}/download`, `my-data-${r.id}.json`)}>Download</button> }]} />
+            { label: 'Status', render: (r) => <span className="capitalize">{r.status}</span> }, { label: '', render: (r) => r.kind === 'self_export' && r.status === 'completed' && <button className="btn-secondary" onClick={() => download(`/privacy/my-requests/${r.id}/download`, `my-data-${r.id}.json`)}>Download</button> }]} />
         </Section>
         <Section title="Active sessions">
           <Table rows={(sessions.data || []).map((s) => ({ ...s }))} cols={[{ label: 'Started', render: (s) => fmt(s.created_at) }, { label: 'Last seen', render: (s) => fmt(s.last_seen_at) }, { label: 'IP', k: 'ip' },

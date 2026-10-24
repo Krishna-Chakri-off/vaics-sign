@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import api, { errMsg, fmt, download } from '../api'
 import { useAuth, ROLE_LABEL } from '../auth'
-import { PageShell, Table, Alert, Modal, Field, SBadge, Section, Tabs, useAsync } from '../components/ui'
+import { PageShell, Table, Alert, Modal, Field, SBadge, Section, Tabs, useAsync , ask } from '../components/ui'
 
 const ROLES = ['org_admin', 'sender', 'template_manager', 'auditor', 'viewer']
 const SCOPES = ['envelopes:read', 'envelopes:write', 'templates:read', 'templates:write', 'bulk:write', 'powerforms:write', 'users:read', 'reports:read', 'audit:read', 'webhooks:write']
@@ -15,7 +15,7 @@ export function UsersGroups() {
   const [m, run] = useMsg(); const [inv, setInv] = useState({ email: '', role: 'sender' }); const [grp, setGrp] = useState(null)
   const reload = () => { users.reload(); invites.reload(); groups.reload() }
   return (
-    <PageShell title="People & roles" subtitle="Invite VAICS staff, assign roles and organise them into groups for shared documents and templates.">
+    <PageShell title="Users & groups" subtitle="Invite people, assign roles and organize them into groups for shared envelopes and templates.">
       <Alert>{m.err}</Alert><Alert kind="ok">{m.ok}</Alert>
       <form className="card flex flex-wrap items-end gap-2" onSubmit={async (e) => { e.preventDefault(); if (await run(() => api.post('/org/invitations', inv), 'Invitation sent (see Email outbox in development).')) { setInv({ ...inv, email: '' }); reload() } }}>
         <Field label="Invite by email" className="min-w-64 flex-1"><input className="input" type="email" value={inv.email} onChange={(e) => setInv({ ...inv, email: e.target.value })} required /></Field>
@@ -29,7 +29,7 @@ export function UsersGroups() {
         { label: '', render: (u) => u.id !== user.id && <div className="flex gap-1">
           <button className="btn-secondary" onClick={() => run(() => api.patch(`/org/users/${u.id}`, { is_active: !u.is_active }), u.is_active ? 'Deactivated; sessions ended' : 'Reactivated').then(reload)}>{u.is_active ? 'Deactivate' : 'Reactivate'}</button>
           <button className="btn-secondary" onClick={() => { const to = prompt(`Transfer ${u.full_name}'s envelopes and templates to (email):`); const dst = (users.data || []).find((x) => x.email === to); if (dst) run(() => api.post(`/org/users/${u.id}/transfer`, { to_user_id: dst.id }), (d) => `Transferred ${d.envelopes} envelope(s), ${d.templates} template(s)`) }}>Transfer</button>
-          <button className="btn-danger" onClick={() => confirm(`Delete ${u.full_name}?`) && run(() => api.delete(`/org/users/${u.id}`), 'User deleted').then(reload)}>Delete</button></div> }]} />
+          <button className="btn-danger" onClick={async () => await ask(`Delete ${u.full_name}?`) && run(() => api.delete(`/org/users/${u.id}`), 'User deleted').then(reload)}>Delete</button></div> }]} />
       <h2>Pending invitations</h2>
       <Table rows={(invites.data || []).filter((i) => i.status === 'pending')} empty="No pending invitations." cols={[{ label: 'Email', k: 'email' }, { label: 'Role', render: (i) => ROLE_LABEL[i.role] }, { label: 'Expires', render: (i) => fmt(i.expires_at) },
         { label: '', render: (i) => <div className="flex gap-1"><button className="btn-secondary" onClick={() => run(() => api.post(`/org/invitations/${i.id}/resend`), 'Invitation resent')}>Resend</button><button className="btn-danger" onClick={() => run(() => api.delete(`/org/invitations/${i.id}`), 'Revoked').then(reload)}>Revoke</button></div> }]} />
@@ -52,7 +52,7 @@ export function SettingsBranding() {
   const setK = (k, v) => setS({ ...S, [k]: v })
   const toggle = (k, v) => setK(k, S[k].includes(v) ? S[k].filter((x) => x !== v) : [...S[k], v])
   return (
-    <PageShell title="Organization" subtitle={`Signing defaults, security policy, signer disclosures and branding for ${O.name}. Data region: ${O.region.toUpperCase()}.`}>
+    <PageShell title="Settings & branding" subtitle={`Organization ${O.name} · data region ${O.region.toUpperCase()}`}>
       <Alert>{m.err}</Alert><Alert kind="ok">{m.ok}</Alert>
       <div className="grid gap-4 lg:grid-cols-2">
         <Section title="Organization">
@@ -164,10 +164,10 @@ export function Privacy() {
         <div className="flex flex-wrap items-end gap-2"><Field label="Person's email" className="min-w-64 flex-1"><input className="input" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></Field>
           <Field label="Request"><select className="input" value={f.kind} onChange={(e) => setF({ ...f, kind: e.target.value })}><option value="access">Access (what we hold)</option><option value="correct">Correct name/email</option><option value="erase">Erase</option></select></Field>
           {f.kind === 'correct' && <><Field label="New name"><input className="input" value={f.new_name || ''} onChange={(e) => setF({ ...f, new_name: e.target.value })} /></Field><Field label="New email"><input className="input" value={f.new_email || ''} onChange={(e) => setF({ ...f, new_email: e.target.value || undefined })} /></Field></>}
-          <button className="btn-accent" onClick={async () => { if (f.kind === 'erase' && !confirm('Erase this person from open records? Completed signed records are retained.')) return; const r = await run(() => api.post('/privacy/dsr', f), 'Request processed'); if (r) { setResult(r.data); dsr.reload(); del.reload() } }}>Run</button></div>
+          <button className="btn-accent" onClick={async () => { if (f.kind === 'erase' && !await ask('Erase this person from open records? Completed signed records are retained.')) return; const r = await run(() => api.post('/privacy/dsr', f), 'Request processed'); if (r) { setResult(r.data); dsr.reload(); del.reload() } }}>Run</button></div>
         {result && <pre className="mt-2 max-h-64 overflow-auto border bg-white p-2">{JSON.stringify(result, null, 2)}</pre>}
         <Table rows={dsr.data || []} cols={[{ label: 'Time', render: (d) => fmt(d.created_at) }, { label: 'Email', k: 'email' }, { label: 'Kind', render: (d) => ({ self_export: 'Staff: copy of data', self_erase: 'Staff: deletion' })[d.kind] || d.kind }, { label: 'Status', k: 'status' },
-          { label: '', render: (d) => d.status === 'pending' && <div className="flex gap-2"><button className="btn-primary !min-h-8" onClick={() => { if (d.kind !== 'self_erase' || confirm('Approve deletion? Open records are pseudonymised and the account is deactivated.')) run(() => api.post(`/privacy/dsr/${d.id}/decide`, { approve: true }), 'Request approved').then(dsr.reload) }}>Approve</button><button className="btn-secondary !min-h-8" onClick={() => run(() => api.post(`/privacy/dsr/${d.id}/decide`, { approve: false }), 'Request rejected').then(dsr.reload)}>Reject</button></div> }]} />
+          { label: '', render: (d) => d.status === 'pending' && <div className="flex gap-2"><button className="btn-primary !min-h-8" onClick={async () => { if (d.kind !== 'self_erase' || await ask('Approve deletion? Open records are pseudonymised and the account is deactivated.')) run(() => api.post(`/privacy/dsr/${d.id}/decide`, { approve: true }), 'Request approved').then(dsr.reload) }}>Approve</button><button className="btn-secondary !min-h-8" onClick={() => run(() => api.post(`/privacy/dsr/${d.id}/decide`, { approve: false }), 'Request rejected').then(dsr.reload)}>Reject</button></div> }]} />
       </Section>
       <Section title="Deletion records">
         <Table rows={del.data || []} empty="Nothing purged yet." cols={[{ label: 'Time', render: (d) => fmt(d.created_at) }, { label: 'Envelope', k: 'envelope_public_id' }, { label: 'Reason', k: 'reason' }, { label: 'Detail', k: 'detail' }]} />
@@ -204,7 +204,7 @@ export function Billing() {
             {Object.entries(p.features).filter(([, v]) => v).map(([f]) => <li key={f}>✓ {f.replaceAll('_', ' ')}</li>)}</ul>
           {S.plan?.code === p.code && S.status === 'active' ? <SBadge s="active" label="Current plan" /> : <button className="btn-accent w-full" onClick={() => checkout(p.code)}>{p.code === 'free' ? 'Switch to Free' : 'Choose'}</button>}
         </div>)}</div>
-        <div className="flex gap-2"><button className="btn-secondary" onClick={() => confirm('Downgrade to Free at once? Paid features stop working.') && run(() => api.post('/billing/cancel'), (d) => d.note).then(() => { sub.reload(); refresh() })}>Cancel subscription</button>
+        <div className="flex gap-2"><button className="btn-secondary" onClick={async () => await ask('Downgrade to Free at once? Paid features stop working.') && run(() => api.post('/billing/cancel'), (d) => d.note).then(() => { sub.reload(); refresh() })}>Cancel subscription</button>
           <button className="btn-secondary" onClick={async () => { const metric = prompt('Buy credits for (envelopes / sms / aadhaar / dsc / idv):', 'envelopes'); const qty = +prompt('Quantity', '100'); if (metric && qty) run(() => api.post('/billing/credits', { metric, quantity: qty }), 'Credit checkout created') }}>Buy credits</button></div>
         <p className="text-slate-500">Enterprise plans with custom limits, invoice billing and PO numbers are arranged with VAICS sales.</p>
       </>}

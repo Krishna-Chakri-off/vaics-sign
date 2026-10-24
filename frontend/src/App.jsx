@@ -10,6 +10,7 @@ import { CompletedAccess, VerifyPage, PrivacyNotice } from './pages/PublicPages'
 import Templates, { Outbox } from './pages/Templates'
 import { UsersGroups, SettingsBranding, AdminAudit, Privacy } from './pages/Admin'
 import Account from './pages/Account'
+import { FeedbackHost } from './components/ui'
 
 // Phase 1: internal VAICS tool. SaaS surfaces (sign-up, billing, platform console, API/webhooks, PowerForms, bulk) are not routed.
 function Private({ children }) {
@@ -21,6 +22,8 @@ function Private({ children }) {
 
 export default function App() {
   return (
+    <>
+    <FeedbackHost />
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route path="/verify-email/:token" element={<VerifyEmail />} />
@@ -47,5 +50,6 @@ export default function App() {
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </>
   )
 }
