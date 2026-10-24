@@ -34,15 +34,15 @@ export default function EnvelopeEditor({ env, reload }) {
   useEffect(() => { if (!doc && env.documents[0]) setDoc(env.documents[0].id) }, [env.documents]) // eslint-disable-line
   useEffect(() => { setBuf(null); if (doc) fetchBuf(`/envelopes/${env.id}/documents/${doc}/file`).then(setBuf).catch((e) => setErr(errMsg(e))) }, [doc, env.id])
 
-  const payload = (quietDraft = false) => ({
+  const payload = (quietDraft = false) => { const keep = (i) => !quietDraft || !!((rs[i]?.name || '').trim() || (rs[i]?.email || '').trim()); return ({
     title, message, labels: labels.split(',').map((s) => s.trim()).filter(Boolean), expires_at: expires ? `${expires}T23:59:00` : null,
     reminder_first_days: +rem.first, reminder_every_days: +rem.every,
-    recipients: rs.map((r, i) => ({ r, i })).filter(({ r }) => !quietDraft || (r.name || '').trim() || (r.email || '').trim()).map(({ r, i }) => ({ client_id: String(i), name: r.name, email: r.email, phone: r.phone || null, order: +r.order || 1, type: r.type, role_name: r.role_name || null,
+    recipients: rs.map((r, i) => ({ r, i })).filter(({ i }) => keep(i)).map(({ r, i }) => ({ client_id: String(i), name: r.name, email: r.email, phone: r.phone || null, order: +r.order || 1, type: r.type, role_name: r.role_name || null,
       auth_method: r.type === 'in_person' ? 'none' : r.auth_method, access_code: r.access_code || null, host_user_id: r.host_user_id || null, private_message: r.private_message || '', language: r.language || 'en', signature_type: r.signature_type || 'electronic' })),
-    fields: fs.filter((f) => f.ri >= 0 && f.ri < rs.length).map((f) => ({ recipient: String(f.ri), document_id: f.document_id, type: f.type, page: f.page, x: f.x, y: f.y, w: f.w, h: f.h,
+    fields: fs.filter((f) => f.ri >= 0 && f.ri < rs.length && keep(f.ri)).map((f) => ({ recipient: String(f.ri), document_id: f.document_id, type: f.type, page: f.page, x: f.x, y: f.y, w: f.w, h: f.h,
       required: f.required ?? true, reason_required: f.reason_required ?? true, label: f.label || null, options: f.options || [], validation: f.validation || null, default_value: f.default_value || null,
       read_only: !!f.read_only, formula: f.formula || null, group_name: f.group_name || null, tooltip: f.tooltip || null, condition: f.condition || {} })),
-  })
+  }) }
   const save = async (quiet) => { setErr(''); setErrs([]); setOk(''); try { await api.put(`/envelopes/${env.id}`, payload(!!quiet && quiet !== 'send')); if (!quiet) { setOk('Draft saved'); reload() } return true } catch (e) { setErr(errMsg(e)); return false } }
   const send = async () => {
     setConfirmSend(false); setBusy(true)
