@@ -58,7 +58,7 @@ def draw_signature(c, r, x, y, w, h, initials=False, color="#0D47A1"):
     _fonts()
     if r.signature_kind in ("drawn", "uploaded") and r.signature_image and "," in r.signature_image:
         img = ImageReader(io.BytesIO(base64.b64decode(r.signature_image.split(",", 1)[1])))
-        c.drawImage(img, x, y, width=w, height=h, mask="auto", preserveAspectRatio=True, anchor="sw")
+        c.drawImage(img, x, y, width=w, height=h, mask="auto", preserveAspectRatio=True, anchor="w")  # keep proportions; never stretch
         return
     font = f"sig_{r.signature_style if r.signature_style in SIG_FONTS else 'great_vibes'}"
     text = (r.initials or "".join(p[0] for p in r.name.split() if p).upper()) if initials else r.name

@@ -176,3 +176,23 @@ def test_expiry_job_and_reminders(client):
         e = s.get(models.Envelope, env["id"]); e.expires_at = models.now() - timedelta(minutes=1); s.commit()
         jobs.expire(s)
         assert s.get(models.Envelope, env["id"]).status == "expired"
+
+
+def test_countersigner_sees_prior_signature_only_after_signing(client):
+    h = signup(client)
+    env = draft(client, h, [{**R[0], "auth_method": "none"}, {**R[1], "auth_method": "none"}])
+    client.post(f"/api/v1/envelopes/{env['id']}/send", headers=h)
+    tok1, _ = link_and_code("ravi@example.com")
+    s1 = client.post(f"/api/v1/public/s/{tok1}/open").json()["session"]
+    e1 = client.get(f"/api/v1/public/s/{tok1}/envelope", headers={"X-Signer-Session": s1}).json()
+    assert e1["completed_fields"] == []  # nobody has signed yet
+    reasons = {f["id"]: "For VAICS" for f in e1["fields"]}
+    r = client.post(f"/api/v1/public/s/{tok1}/finish", json={"consent": True, "intent": True, "signature_meaning": "Approved", "signature": {"kind": "typed", "style": "allura"}, "reasons": reasons}, headers={"X-Signer-Session": s1})
+    assert r.status_code == 200, r.text
+    tok2, _ = link_and_code("client@example.org")
+    s2 = client.post(f"/api/v1/public/s/{tok2}/open").json()["session"]
+    e2 = client.get(f"/api/v1/public/s/{tok2}/envelope", headers={"X-Signer-Session": s2}).json()
+    prior = e2["completed_fields"]
+    assert len(prior) == 1 and prior[0]["by"] == "Ravi VAICS" and prior[0]["reason"] == "For VAICS" and prior[0]["signed_at"]
+    assert all("email" not in f and "access_code" not in f for f in prior)
+    assert all(f["id"] not in {p["id"] for p in prior} for f in e2["fields"])
