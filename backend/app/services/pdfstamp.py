@@ -53,7 +53,7 @@ def page_matrix(page):
     return Transformation((a, b, c, d, e + ox, f + oy)), (ch, cw) if rot in (90, 270) else (cw, ch)
 
 
-def draw_signature(c, r, x, y, w, h, initials=False, color="#0D47A1"):
+def draw_signature(c, r, x, y, w, h, initials=False, color="#000000"):
     """Draw the recipient's adopted signature (typed/drawn/uploaded) inside the box (bottom-left x,y)."""
     _fonts()
     if r.signature_kind in ("drawn", "uploaded") and r.signature_image and "," in r.signature_image:
@@ -87,12 +87,12 @@ def stamp_document(src: bytes, fields, recipients: dict, tz: str, brand: dict) -
                 lines += [(loc, "VSSans"), (utc, "VSSans"), (f"SHA-256: {f.field_hash}", "VSSans")]
                 small = max(3.0, min(6.5, bh / (len(lines) + 4)))
                 text_h = small * 1.22 * len(lines) + 2
-                draw_signature(c, r, bx + 1, by + text_h, bw - 2, max(6, bh - text_h - 1), color=brand["primary"])
+                draw_signature(c, r, bx + 1, by + text_h, bw - 2, max(6, bh - text_h - 1), color="#000000")
                 yy = by + 2 + small * 1.22 * (len(lines) - 1)
                 for txt, font in lines:
                     c.setFillColor(ink if font.endswith("Bold") else muted); c.setFont(font, _fit(txt, font, small, bw - 4)); c.drawString(bx + 2, yy, txt); yy -= small * 1.22
             elif f.type == "initials":
-                draw_signature(c, r, bx, by, bw, bh, initials=True, color=brand["primary"])
+                draw_signature(c, r, bx, by, bw, bh, initials=True, color="#000000")
             elif f.type == "checkbox":
                 c.setStrokeColor(ink); s = min(bw, bh); c.rect(bx, by + bh - s, s, s)
                 if f.value in ("true", "1", "X", "on", "yes"):
@@ -156,7 +156,7 @@ def certificate(env, docs, recipients, fields, events, owner, brand: dict, tz: s
             line(f"Declined: {r.decline_reason}", s=7.5, col=HexColor("#B91C1C"), indent=18)
         rf = [f for f in fields if f.recipient_id == r.id and f.type == "signature" and f.signed_at]
         if rf:
-            need(34); draw_signature(c, r, 54, state["y"] - 24, 150, 28, color=brand["primary"]); state["y"] -= 32
+            need(34); draw_signature(c, r, 54, state["y"] - 24, 150, 28, color="#000000"); state["y"] -= 32
             for f in rf:
                 line(f"Signature field · doc {f.document_id} page {f.page} · reason: {f.reason or '-'} · field SHA-256 {f.field_hash}", s=6.5, col=muted, indent=18)
     state["y"] -= 4; line("Event history (UTC, hash-chained)", "VSSans-Bold", 10)

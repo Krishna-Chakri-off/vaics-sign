@@ -13,7 +13,7 @@ const nowStamp = () => { const d = new Date(); return `${d.toLocaleString('en-IN
 function SignaturePad({ onChange }) {
   const c = useRef(null); const wrap = useRef(null); const pts = useRef([]); const strokes = useRef([]); const drawing = useRef(false)
   const [empty, setEmpty] = useState(true)
-  const ink = '#0B2E6F'; const LW = 2.5
+  const ink = '#000000'; const LW = 2.5
   const ctx = () => c.current.getContext('2d')
   const setup = () => {
     const el = c.current; if (!el) return; const r = el.getBoundingClientRect(); const dpr = window.devicePixelRatio || 1
@@ -79,7 +79,7 @@ function AdoptModal({ name, initial, allowed, onClose, onAdopt }) {
     <Tabs value={kind} onChange={(k) => { setKind(k); setImage('') }} tabs={[['typed', t('typed')], ['drawn', t('drawn')], ['uploaded', t('uploaded')]].filter(([k]) => allowed.includes(k))} />
     <Alert>{err}</Alert>
     {kind === 'typed' && <div className="space-y-1">{STYLES.map(([v, l]) => <label key={v} className={`flex cursor-pointer items-center gap-3 border p-2 ${style === v ? 'border-[#0D47A1] bg-[#F2F8FF]' : 'border-gray-200'}`}>
-      <input type="radio" checked={style === v} onChange={() => setStyle(v)} /><span className={`sig-${v} min-w-0 flex-1 truncate border-b border-[#CBD5E1] px-1 pb-0.5 text-[34px] leading-[1.35] text-[#0B2E6F]`}>{name}</span><span className="ml-auto text-slate-400">{l}</span></label>)}</div>}
+      <input type="radio" checked={style === v} onChange={() => setStyle(v)} /><span className={`sig-${v} min-w-0 flex-1 truncate border-b border-[#CBD5E1] px-1 pb-0.5 text-[34px] leading-[1.35] text-black`}>{name}</span><span className="ml-auto text-slate-400">{l}</span></label>)}</div>}
     {kind === 'drawn' && <SignaturePad onChange={setImage} />}
     {kind === 'uploaded' && <div><input type="file" accept="image/png,image/jpeg" onChange={(e) => file(e.target.files[0])} />{image && <div className="mt-2 flex h-24 items-center justify-center border bg-white p-1"><img src={image} alt="signature" className="max-h-full max-w-full object-contain" /></div>}</div>}
     <Field label="Initials"><input className="input" value={initials} maxLength={10} onChange={(e) => setInitials(e.target.value)} /></Field>
@@ -140,8 +140,8 @@ export default function SignPortal() {
   const name = env?.recipient.name || info?.recipient.name || ''
 
   const sigMark = (f) => sig?.kind && sig.kind !== 'typed' && sig.image ? <img src={sig.image} alt="signature" className="h-full max-h-[64px] w-full object-contain object-left" />
-    : f.type === 'initials' ? <span className={`sig-${sig?.style || 'great_vibes'} text-[#0D47A1]`} style={{ fontSize: 'clamp(12px, 2vw, 22px)' }}>{sig?.initials || env.recipient.initials}</span>
-      : <span className={`sig-${sig?.style || 'great_vibes'} truncate leading-tight text-[#0D47A1]`} style={{ fontSize: 'clamp(14px, 2.4vw, 26px)' }}>{name}</span>
+    : f.type === 'initials' ? <span className={`sig-${sig?.style || 'great_vibes'} text-black`} style={{ fontSize: 'clamp(12px, 2vw, 22px)' }}>{sig?.initials || env.recipient.initials}</span>
+      : <span className={`sig-${sig?.style || 'great_vibes'} truncate leading-tight text-black`} style={{ fontSize: 'clamp(14px, 2.4vw, 26px)' }}>{name}</span>
   const input = (f) => {
     const set = (v) => setValues({ ...values, [f.id]: v }); const v = values[f.id] ?? ''
     const cls = 'h-full w-full bg-transparent px-1 text-[11px] outline-none focus:bg-white'
@@ -159,7 +159,7 @@ export default function SignPortal() {
       {['signature', 'initials'].includes(f.type) ? <>
         <div className="flex min-h-0 flex-1 items-center px-1">{f.signature_image && f.signature_kind !== 'typed'
           ? <img src={f.signature_image} alt={`Signature of ${f.by}`} className="h-full max-h-[64px] w-full object-contain object-left" />
-          : <span className={`sig-${f.signature_style || 'great_vibes'} truncate leading-tight text-[#0B2E6F]`} style={{ fontSize: f.type === 'initials' ? 'clamp(12px, 2vw, 22px)' : 'clamp(14px, 2.4vw, 26px)' }}>{f.type === 'initials' ? f.by.split(/\s+/).map((p) => p[0]).join('').toUpperCase() : f.by}</span>}</div>
+          : <span className={`sig-${f.signature_style || 'great_vibes'} truncate leading-tight text-black`} style={{ fontSize: f.type === 'initials' ? 'clamp(12px, 2vw, 22px)' : 'clamp(14px, 2.4vw, 26px)' }}>{f.type === 'initials' ? f.by.split(/\s+/).map((p) => p[0]).join('').toUpperCase() : f.by}</span>}</div>
         {f.type === 'signature' && <div className="px-1 pb-0.5 text-[9px] leading-tight text-slate-600">Name: {f.by}{f.reason ? <><br />Reason: {f.reason}</> : null}<br />Signed: {f.signed_at ? new Date(f.signed_at.endsWith('Z') ? f.signed_at : `${f.signed_at}Z`).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'medium' }) + ' IST' : '-'}</div>}
       </> : <div className="flex h-full items-center px-1 text-[11px]">{f.type === 'checkbox' ? (['true', '1', 'yes', 'on', 'X'].includes(f.value) ? '✓' : '') : `${f.value ?? ''}`}</div>}
       <span className="absolute right-0 top-0 bg-slate-600 px-1 text-[8px] uppercase tracking-wide text-white">Signed · {f.by}</span>
