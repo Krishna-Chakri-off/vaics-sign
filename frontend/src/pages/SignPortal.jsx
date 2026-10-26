@@ -167,13 +167,13 @@ export default function SignPortal() {
     {fields.filter((f) => f.document_id === docId && f.page === page && active(f)).map((f) => {
       const need = needs(f)
       return <div key={f.id} ref={(el) => (refs.current[f.id] = el)} title={f.tooltip || f.label || ''} onClick={() => setFocus(f.id)}
-        className={`absolute flex flex-col overflow-visible border-2 ${focus === f.id ? 'ring-4 ring-[#E6007E]/30' : ''} ${f.type === 'signature' ? 'bg-white/95' : 'bg-[#FFF7FB]/90'}`}
-        style={{ left: `${f.x * 100}%`, top: `${f.y * 100}%`, width: `${f.w * 100}%`, minHeight: `${f.h * 100}%`, borderColor: need ? '#E6007E' : '#059669' }}>
+        className={`absolute flex flex-col overflow-visible rounded-sm ${focus === f.id ? 'ring-2 ring-[#E6007E]/25' : ''} ${need ? 'bg-[#FFF7FB]/60' : 'bg-white/80'}`}
+        style={{ left: `${f.x * 100}%`, top: `${f.y * 100}%`, width: `${f.w * 100}%`, minHeight: `${f.h * 100}%`, border: need ? '1px dashed rgba(230,0,126,0.35)' : '1px solid rgba(5,150,105,0.4)', borderBottom: need ? '2px dotted #E6007E' : '1px solid #059669' }}>
         {f.type === 'signature' ? <>
-          <button className="flex flex-1 items-center px-1 text-left" onClick={() => !sig && setAdopt(true)}>{sig ? sigMark(f) : <span className="font-semibold text-[#E6007E]">Click to sign</span>}</button>
+          <button className="flex flex-1 items-center px-1 text-left" onClick={() => !sig && setAdopt(true)}>{sig ? sigMark(f) : <span className="text-[11px] font-medium tracking-wide text-[#E6007E]">✎ Sign here</span>}</button>
           <div className="px-1 text-[9px] leading-tight text-slate-600">Name: {name}<br />{sig ? nowStamp() : 'Timestamp & SHA-256 added on signing'}</div>
           <input className="w-full border-t border-[#CBD5E1] bg-[#F2F8FF] px-1 py-0.5 text-[11px] outline-none focus:bg-white" placeholder={f.reason_required ? t('reason') : 'Reason (optional)'} value={reasons[f.id] || ''} onFocus={() => setFocus(f.id)} onChange={(e) => setReasons({ ...reasons, [f.id]: e.target.value })} />
-        </> : f.type === 'initials' ? <button className="flex h-full items-center justify-center" onClick={() => !sig && setAdopt(true)}>{sig ? sigMark(f) : <span className="text-[10px] font-semibold text-[#E6007E]">Initial</span>}</button>
+        </> : f.type === 'initials' ? <button className="flex h-full items-center justify-center" onClick={() => !sig && setAdopt(true)}>{sig ? sigMark(f) : <span className="text-[10px] font-medium text-[#E6007E]">Initial here</span>}</button>
           : AUTO.includes(f.type) ? <div className="px-1 text-[11px] text-slate-600">{f.type === 'name' ? name : f.type === 'email' ? env.recipient.email : f.type === 'date_signed' ? new Date().toLocaleDateString('en-IN') : 'calculated'}</div>
             : input(f)}
       </div>
