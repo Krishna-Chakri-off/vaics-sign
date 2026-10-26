@@ -11,9 +11,12 @@ export const FIELD_TYPES = [
   ['checkbox', 'Checkbox', 0.03, 0.022], ['radio', 'Radio', 0.03, 0.022], ['dropdown', 'Dropdown', 0.2, 0.035], ['attachment', 'Attachment', 0.2, 0.04], ['stamp', 'Company stamp', 0.18, 0.1], ['formula', 'Formula', 0.15, 0.035],
 ]
 const FT = Object.fromEntries(FIELD_TYPES.map((x) => [x[0], x]))
-const RTYPES = [['signer', 'Needs to sign'], ['approver', 'Approver'], ['viewer', 'Needs to view'], ['cc', 'Receives a copy (CC)'], ['in_person', 'In-person signer'], ['witness', 'Witness'], ['editor', 'Editor']]
-const AUTH = [['access_code', 'Access code (sent separately)'], ['email_otp', 'Email one-time code'], ['sms_otp', 'SMS one-time code'], ['none', 'Email link only']]
-const SIGTYPE = [['electronic', 'Electronic signature'], ['aadhaar_esign', 'Aadhaar eSign (provider required)'], ['dsc', 'DSC token (provider required)'], ['qes', 'EU QES (provider required)']]
+// DocuSign-style essential palette; other types stay supported for existing envelopes but are not offered
+const PALETTE = ['signature', 'initials', 'date_signed', 'name', 'email', 'company', 'title', 'text', 'checkbox', 'stamp']
+const isRep = (r) => /vaics/i.test(r?.role_name || '')
+const repIndex = (rs) => { const i = rs.findIndex(isRep); return i >= 0 ? i : 0 }
+const RTYPES = [['signer', 'Needs to sign'], ['approver', 'Approver'], ['viewer', 'Needs to view'], ['cc', 'Receives a copy (CC)'], ['in_person', 'In-person signer'], ['witness', 'Witness']]
+const AUTH = [['access_code', 'Access code (sent separately)'], ['email_otp', 'Email one-time code'], ['none', 'Email link only']]
 
 export default function EnvelopeEditor({ env, reload }) {
   const { user } = useAuth()
@@ -30,6 +33,8 @@ export default function EnvelopeEditor({ env, reload }) {
   const [err, setErr] = useState(''); const [errs, setErrs] = useState([]); const [ok, setOk] = useState(''); const [busy, setBusy] = useState(false)
   const [members, setMembers] = useState([]); const [confirmSend, setConfirmSend] = useState(false)
   const drag = useRef(null); const [ghost, setGhost] = useState(null)
+  const [stampOk, setStampOk] = useState(null)
+  useEffect(() => { api.get('/org/branding/stamp').then((r) => setStampOk(!!r.data.configured)).catch(() => {}) }, [])
   useEffect(() => { api.get('/org/users').then((r) => setMembers(r.data)).catch(() => {}) }, [])
   useEffect(() => { if (!doc && env.documents[0]) setDoc(env.documents[0].id) }, [env.documents]) // eslint-disable-line
   useEffect(() => { setBuf(null); if (doc) fetchBuf(`/envelopes/${env.id}/documents/${doc}/file`).then(setBuf).catch((e) => setErr(errMsg(e))) }, [doc, env.id])
@@ -82,14 +87,14 @@ export default function EnvelopeEditor({ env, reload }) {
     if (!g || g.mode !== 'new' || !ghost) { setGhost(null); return }
     const [, , DW, DH] = FT[ftype]; let { x, y, w, h } = ghost
     if (w < 0.02 || h < 0.012) { w = DW; h = DH; x = clamp(g.x0 - DW / 2, 0, 1 - DW); y = clamp(g.y0 - DH / 2, 0, 1 - DH) }
-    const f = { ri: active, document_id: doc, type: ftype, page: g.page, x: +x.toFixed(4), y: +y.toFixed(4), w: +w.toFixed(4), h: +h.toFixed(4), required: !['checkbox', 'formula'].includes(ftype), reason_required: ftype === 'signature', options: ftype === 'dropdown' || ftype === 'radio' ? ['Option 1', 'Option 2'] : [] }
+    const f = { ri: ftype === 'stamp' ? repIndex(rs) : active, document_id: doc, type: ftype, page: g.page, x: +x.toFixed(4), y: +y.toFixed(4), w: +w.toFixed(4), h: +h.toFixed(4), required: !['checkbox', 'formula'].includes(ftype), reason_required: ftype === 'signature', options: ftype === 'dropdown' || ftype === 'radio' ? ['Option 1', 'Option 2'] : [] }
     setFs([...fs, f]); setSelF(fs.length); setGhost(null)
   }
   const overlay = (page) => (
     <div data-overlay className="absolute inset-0 cursor-crosshair" style={{ touchAction: 'none' }} onPointerDown={onDown(page)} onPointerMove={onMove} onPointerUp={onUp}>
       {fs.map((f, i) => f.document_id === doc && f.page === page && (
-        <div key={i} className={`group absolute rounded-sm ${selF === i ? 'bg-white/40 outline outline-1 outline-offset-2' : 'bg-white/10 hover:bg-white/30'}`} style={{ left: `${f.x * 100}%`, top: `${f.y * 100}%`, width: `${f.w * 100}%`, height: `${f.h * 100}%`, outlineColor: COLORS[f.ri % COLORS.length], cursor: 'move', border: (f.type === 'signature' || f.type === 'initials') ? 'none' : `1px dashed ${COLORS[f.ri % COLORS.length]}`, borderBottom: `2px dotted ${COLORS[f.ri % COLORS.length]}` }} onPointerDown={onBoxDown(i, 'move')}>
-          <div className="pointer-events-none truncate px-0.5 text-[9px] font-medium leading-tight" style={{ color: COLORS[f.ri % COLORS.length] }}>{f.type === 'signature' ? 'Sign here' : f.type === 'initials' ? 'Initial here' : FT[f.type]?.[1]}{f.required ? '*' : ''} · {rs[f.ri]?.role_name || rs[f.ri]?.name || `Recipient ${f.ri + 1}`}</div>
+        <div key={i} className={`group absolute ${selF === i ? 'outline outline-1 outline-offset-2' : ''}`} style={{ left: `${f.x * 100}%`, top: `${f.y * 100}%`, width: `${f.w * 100}%`, height: `${f.h * 100}%`, outlineColor: COLORS[f.ri % COLORS.length], cursor: 'move', border: `1.5px dotted ${COLORS[f.ri % COLORS.length]}`, borderRadius: 4, backgroundColor: `${COLORS[f.ri % COLORS.length]}0F` }} onPointerDown={onBoxDown(i, 'move')}>
+          <div className="pointer-events-none truncate px-0.5 text-[9px] font-medium leading-tight" style={{ color: COLORS[f.ri % COLORS.length] }}>{f.type === 'signature' ? 'Sign here' : f.type === 'initials' ? 'Initial here' : f.type === 'stamp' ? 'Company stamp' : FT[f.type]?.[1]}{f.required ? '*' : ''} · {rs[f.ri]?.role_name || rs[f.ri]?.name || `Recipient ${f.ri + 1}`}</div>
           <button className={`absolute -top-1.5 -right-1.5 h-3.5 w-3.5 rounded-full border border-slate-300 bg-white text-[9px] leading-3 text-slate-500 shadow-sm hover:border-red-400 hover:text-red-600 ${selF === i ? 'flex' : 'hidden group-hover:flex'} items-center justify-center`} onPointerDown={(e) => e.stopPropagation()} onClick={() => { setFs(fs.filter((_, j) => j !== i)); setSelF(null) }} aria-label="Remove field">×</button>
           <span className={`absolute -right-1 -bottom-1 h-2 w-2 cursor-se-resize rounded-full border border-white shadow-sm ${selF === i ? 'block' : 'hidden group-hover:block'}`} style={{ background: COLORS[f.ri % COLORS.length] }} onPointerDown={onBoxDown(i, 'resize')} />
         </div>))}
@@ -128,16 +133,14 @@ export default function EnvelopeEditor({ env, reload }) {
                 <input className="input" placeholder="Full name" value={r.name} onChange={(e) => setR(i, 'name', e.target.value)} />
                 <input className="input" placeholder="Email" type="email" value={r.email} onChange={(e) => setR(i, 'email', e.target.value)} />
                 <div className="grid grid-cols-2 gap-1">
-                  <select className="input" value={r.type} onChange={(e) => setR(i, 'type', e.target.value)}>{RTYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+                  <select className="input" value={r.type} onChange={(e) => setR(i, 'type', e.target.value)}>{[...RTYPES, ...(RTYPES.some(([v]) => v === r.type) ? [] : [[r.type, r.type]])].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
                   {r.type === 'in_person' ? <select className="input" value={r.host_user_id || ''} onChange={(e) => setR(i, 'host_user_id', +e.target.value || null)}><option value="">Host…</option>{members.map((m) => <option key={m.id} value={m.id}>{m.full_name}</option>)}</select>
-                    : <select className="input" value={r.auth_method} onChange={(e) => setR(i, 'auth_method', e.target.value)}>{AUTH.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>}
+                    : <select className="input" value={r.auth_method} onChange={(e) => setR(i, 'auth_method', e.target.value)}>{[...AUTH, ...(AUTH.some(([v]) => v === r.auth_method) ? [] : [[r.auth_method, r.auth_method]])].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>}
                 </div>
                 {active === i && <>
                   {r.auth_method === 'sms_otp' && <input className="input" placeholder="Mobile (+91…)" value={r.phone || ''} onChange={(e) => setR(i, 'phone', e.target.value)} />}
                   {r.auth_method === 'access_code' && <input className="input" placeholder="Optional: your own 6–8 digit code (share it yourself)" value={r.access_code || ''} onChange={(e) => setR(i, 'access_code', e.target.value.replace(/\D/g, ''))} maxLength={8} />}
-                  <select className="input" value={r.signature_type || 'electronic'} onChange={(e) => setR(i, 'signature_type', e.target.value)}>{SIGTYPE.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
                   <input className="input" placeholder="Private message to this recipient" value={r.private_message || ''} onChange={(e) => setR(i, 'private_message', e.target.value)} />
-                  <select className="input" value={r.language || 'en'} onChange={(e) => setR(i, 'language', e.target.value)}><option value="en">Email & signing page: English</option><option value="hi">Email & signing page: हिन्दी</option></select>
                 </>}
                 <div className="text-slate-500">{fs.filter((f) => f.ri === i).length} field(s)</div>
               </div>))}
@@ -147,10 +150,12 @@ export default function EnvelopeEditor({ env, reload }) {
           <div className="card space-y-2">
             <h2>3 · Fields</h2>
             <p className="text-slate-500">Select a recipient, pick a field type, then <b>click</b> (or tap) the page to drop it or <b>drag</b> to draw it. Drag to move, corner to resize.</p>
-            <div className="flex flex-wrap gap-1">{FIELD_TYPES.map(([v, l]) => <button key={v} className={`border px-2 py-1 ${ftype === v ? 'border-[#0D47A1] bg-[#0D47A1] text-white' : 'border-gray-300 bg-white'}`} onClick={() => setFtype(v)}>{l}</button>)}</div>
+            {fs.some((f) => f.type === 'stamp') && stampOk === false && <div className="border border-amber-300 bg-amber-50 p-2 text-amber-900">No official company stamp is configured. An org admin must upload it in Settings &amp; branding before this envelope can be sent.</div>}
+            <div className="flex flex-wrap gap-1">{FIELD_TYPES.filter(([v]) => PALETTE.includes(v)).map(([v, l]) => <button key={v} className={`border px-2 py-1 ${ftype === v ? 'border-[#0D47A1] bg-[#0D47A1] text-white' : 'border-gray-300 bg-white'}`} onClick={() => setFtype(v)}>{l}</button>)}</div>
             {sf && <div className="space-y-1 border border-[#B8D0E8] bg-[#F2F8FF] p-2">
               <b>Selected: {FT[sf.type][1]} · {rs[sf.ri]?.name}</b>
-              <select className="input" value={sf.ri} onChange={(e) => setSf('ri', +e.target.value)}>{rs.map((r, i) => <option key={i} value={i}>Assign to: {r.name || `Recipient ${i + 1}`}</option>)}</select>
+              {sf.type === 'stamp' ? <div className="text-slate-600">Applied by: {rs[sf.ri]?.role_name || rs[sf.ri]?.name} (internal signer only). The official stamp image set by your admin is placed when they sign.</div>
+                : <select className="input" value={sf.ri} onChange={(e) => setSf('ri', +e.target.value)}>{rs.map((r, i) => <option key={i} value={i}>Assign to: {r.name || `Recipient ${i + 1}`}</option>)}</select>}
               <input className="input" placeholder="Label (also used for prefill/CSV columns)" value={sf.label || ''} onChange={(e) => setSf('label', e.target.value)} />
               <input className="input" placeholder="Tooltip / help text" value={sf.tooltip || ''} onChange={(e) => setSf('tooltip', e.target.value)} />
               <label className="flex gap-2"><input type="checkbox" checked={sf.required ?? true} onChange={(e) => setSf('required', e.target.checked)} /> Required</label>
@@ -162,7 +167,6 @@ export default function EnvelopeEditor({ env, reload }) {
               {['dropdown', 'radio'].includes(sf.type) && <input className="input" placeholder="Options, comma separated" value={(sf.options || []).join(', ')} onChange={(e) => setSf('options', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))} />}
               {sf.type === 'radio' && <input className="input" placeholder="Radio group name" value={sf.group_name || ''} onChange={(e) => setSf('group_name', e.target.value)} />}
               {sf.type === 'formula' && <input className="input" placeholder="Formula, e.g. {12} * {13}  (field ids)" value={sf.formula || ''} onChange={(e) => setSf('formula', e.target.value)} />}
-              <input className="input" placeholder='Show only if: field id = value (e.g. 12=Yes)' value={sf.condition?.field_id ? `${sf.condition.field_id}=${sf.condition.equals ?? ''}` : ''} onChange={(e) => { const [a, b] = e.target.value.split('='); setSf('condition', a ? { field_id: +a || a, equals: b ?? '' } : {}) }} />
               {sf.id && <div className="text-slate-400">Field id {sf.id}</div>}
             </div>}
           </div>

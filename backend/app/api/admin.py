@@ -247,6 +247,41 @@ async def upload_logo(request: Request, file: UploadFile = File(...), p: Princip
     return {"ok": True}
 
 
+@router.get("/branding/stamp")
+def get_stamp(p: Principal = Depends(org_member)):
+    from ..services import companystamp
+    return {"configured": companystamp.meta(p.org) is not None, **(companystamp.meta(p.org) or {})}
+
+
+@router.get("/branding/stamp/image")
+def get_stamp_image(p: Principal = Depends(perm("settings.manage"))):
+    from ..services import companystamp
+    m = companystamp.meta(p.org)
+    if not m: raise HTTPException(404, "No company stamp configured")
+    return Response(companystamp.load(p.org, m["sha256"]), media_type=m["mime"], headers={"Cache-Control": "no-store"})
+
+
+@router.post("/branding/stamp")
+async def upload_stamp(request: Request, file: UploadFile = File(...), p: Principal = Depends(perm("settings.manage")), db: Session = Depends(get_db)):
+    from ..services import companystamp
+    before = companystamp.meta(p.org)
+    m = companystamp.save(p.org, await file.read(1024 * 1024 + 1), p.user.email)
+    audit.admin_log(db, p.org.id, p.user, "org.company_stamp_replaced" if before else "org.company_stamp_uploaded", p.org.slug,
+                    before={"sha256": before["sha256"]} if before else None, after={"sha256": m["sha256"], "size": m["size"], "mime": m["mime"]}, req=request)
+    db.commit()
+    return {"configured": True, **m}
+
+
+@router.delete("/branding/stamp")
+def delete_stamp(request: Request, p: Principal = Depends(perm("settings.manage")), db: Session = Depends(get_db)):
+    from ..services import companystamp
+    before = companystamp.remove(p.org)
+    if not before: raise HTTPException(404, "No company stamp configured")
+    audit.admin_log(db, p.org.id, p.user, "org.company_stamp_removed", p.org.slug, before={"sha256": before["sha256"]}, req=request)
+    db.commit()
+    return {"configured": False}
+
+
 # ---------- audit log ----------
 @router.get("/audit-log")
 def admin_audit(format: str = "json", q: str | None = None, p: Principal = Depends(perm("envelopes.view_all")), db: Session = Depends(get_db)):

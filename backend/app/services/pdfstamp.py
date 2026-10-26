@@ -66,7 +66,7 @@ def draw_signature(c, r, x, y, w, h, initials=False, color="#000000"):
     c.setFillColor(HexColor(color)); c.setFont(font, size); c.drawString(x + 2, y + size * 0.3 + 1, text)
 
 
-def stamp_document(src: bytes, fields, recipients: dict, tz: str, brand: dict) -> bytes:
+def stamp_document(src: bytes, fields, recipients: dict, tz: str, brand: dict, stamp_loader=None) -> bytes:
     _fonts()
     reader = PdfReader(io.BytesIO(src)); writer = PdfWriter()
     blue, muted, ink = HexColor(brand["primary"]), HexColor("#475569"), HexColor("#0F172A")
@@ -98,8 +98,10 @@ def stamp_document(src: bytes, fields, recipients: dict, tz: str, brand: dict) -
                 if f.value in ("true", "1", "X", "on", "yes"):
                     c.setFont("VSSans-Bold", s * 0.9); c.setFillColor(ink); c.drawString(bx + s * 0.15, by + bh - s * 0.85, "✓")
             elif f.type == "stamp":
-                c.setStrokeColor(HexColor(brand["accent"])); c.setLineWidth(1.2); c.rect(bx, by, bw, bh)
-                c.setFillColor(HexColor(brand["accent"])); txt = f.value or brand["org_name"]; c.setFont("VSSans-Bold", _fit(txt, "VSSans-Bold", min(bh * 0.4, 12), bw - 4)); c.drawCentredString(bx + bw / 2, by + bh / 2 - 3, txt)
+                # official company stamp image (aspect fit, centred); legacy text-only values are not drawn
+                if stamp_loader and str(f.value or "").startswith("sha256:"):
+                    img = ImageReader(io.BytesIO(stamp_loader(f.value.split(":", 1)[1])))
+                    c.drawImage(img, bx, by, width=bw, height=bh, mask="auto", preserveAspectRatio=True, anchor="c")
             elif f.type == "attachment":
                 txt = f"Attachment: {f.value}"; c.setFillColor(muted); c.setFont("VSSans", _fit(txt, "VSSans", f.font_size or 9, bw - 2)); c.drawString(bx + 1, by + 2, txt)
             else:

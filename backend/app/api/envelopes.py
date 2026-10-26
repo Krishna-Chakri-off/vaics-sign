@@ -270,6 +270,8 @@ def apply_prepare(db, p: Principal, env: Envelope, body: PrepareIn):
                 raise HTTPException(422, "Field must be inside the page")
             if fi.type in ("signature", "initials") and r.type not in ("signer", "in_person", "witness"):
                 raise HTTPException(422, f"{r.type} recipients cannot have signature fields")
+            if fi.type == "stamp" and r.type != "signer":
+                raise HTTPException(422, "The company stamp can only be assigned to the VAICS representative (an internal signer)")
             env.fields.append(Field(envelope_id=env.id, document_id=d.id, recipient_id=r.id, **fi.model_dump(exclude={"recipient", "document_id"})))
     wf.reindex(env)
 

@@ -145,6 +145,7 @@ export default function SignPortal() {
   const input = (f) => {
     const set = (v) => setValues({ ...values, [f.id]: v }); const v = values[f.id] ?? ''
     const cls = 'h-full w-full bg-transparent px-1 text-[11px] outline-none focus:bg-white'
+    if (f.type === 'stamp') return <div className="flex h-full items-center justify-center px-1 text-center text-[10px] text-slate-600">Official company stamp is applied when you finish</div>
     if (f.read_only) return <div className="px-1 text-[11px]">{v}</div>
     if (f.type === 'checkbox') return <input type="checkbox" className="m-auto block h-full" checked={v === 'true'} onChange={(e) => set(e.target.checked ? 'true' : '')} />
     if (f.type === 'radio') return <select className={cls} value={v} onChange={(e) => set(e.target.value)}><option value="">—</option>{(f.options || []).map((o) => <option key={o}>{o}</option>)}</select>
@@ -167,8 +168,8 @@ export default function SignPortal() {
     {fields.filter((f) => f.document_id === docId && f.page === page && active(f)).map((f) => {
       const need = needs(f)
       return <div key={f.id} ref={(el) => (refs.current[f.id] = el)} title={f.tooltip || f.label || ''} onClick={() => setFocus(f.id)}
-        className={`absolute flex flex-col overflow-visible rounded-sm ${focus === f.id ? 'ring-2 ring-[#E6007E]/25' : ''} ${need ? 'bg-[#FFF7FB]/60' : 'bg-white/80'}`}
-        style={{ left: `${f.x * 100}%`, top: `${f.y * 100}%`, width: `${f.w * 100}%`, minHeight: `${f.h * 100}%`, border: need ? '1px dashed rgba(230,0,126,0.35)' : '1px solid rgba(5,150,105,0.4)', borderBottom: need ? '2px dotted #E6007E' : '1px solid #059669' }}>
+        className={`absolute flex flex-col overflow-visible ${focus === f.id ? 'ring-2 ring-[#E6007E]/25' : ''} ${need ? 'bg-[#E6007E]/[0.04]' : 'bg-white/80'}`}
+        style={{ left: `${f.x * 100}%`, top: `${f.y * 100}%`, width: `${f.w * 100}%`, minHeight: `${f.h * 100}%`, border: need ? '1.5px dotted #E6007E' : '1px solid #059669', borderRadius: 4 }}>
         {f.type === 'signature' ? <>
           <button className="flex flex-1 items-center px-1 text-left" onClick={() => !sig && setAdopt(true)}>{sig ? sigMark(f) : <span className="text-[11px] font-medium tracking-wide text-[#E6007E]">✎ Sign here</span>}</button>
           <div className="px-1 text-[9px] leading-tight text-slate-600">Name: {name}<br />{sig ? nowStamp() : 'Timestamp & SHA-256 added on signing'}</div>

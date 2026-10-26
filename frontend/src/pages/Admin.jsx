@@ -42,6 +42,26 @@ export function UsersGroups() {
     </PageShell>)
 }
 
+function CompanyStamp() {
+  const [m, run] = useMsg(); const [st, setSt] = useState(null); const [img, setImg] = useState('')
+  const load = () => api.get('/org/branding/stamp').then(async (r) => {
+    setSt(r.data); setImg('')
+    if (r.data.configured) { try { const b = await api.get('/org/branding/stamp/image', { responseType: 'blob' }); setImg(URL.createObjectURL(b.data)) } catch { /* preview optional */ } }
+  }).catch(() => {})
+  useEffect(() => { load() }, [])
+  return <div className="card mt-4 space-y-2">
+    <h2>Official company stamp</h2>
+    <p className="text-slate-500">Upload the official VAICS stamp/seal (transparent PNG recommended, PNG or JPEG, up to 1 MB). It is placed on Company stamp fields when the VAICS representative signs; signers can never upload their own stamp. Uploads, replacements and removals are recorded in the admin audit log.</p>
+    <Alert>{m.err}</Alert><Alert kind="ok">{m.ok}</Alert>
+    <div className="flex flex-wrap items-center gap-3">
+      {img ? <img src={img} alt="company stamp" className="h-20 w-20 border bg-white object-contain p-1" /> : <div className="flex h-20 w-20 items-center justify-center border border-dashed text-center text-[10px] text-slate-400">No stamp</div>}
+      <label className="btn-secondary cursor-pointer">{st?.configured ? 'Replace stamp' : 'Upload stamp'}<input hidden type="file" accept="image/png,image/jpeg" onChange={async (e) => { const fd = new FormData(); fd.append('file', e.target.files[0]); e.target.value = ''; await run(() => api.post('/org/branding/stamp', fd), 'Company stamp saved'); load() }} /></label>
+      {st?.configured && <button className="btn-secondary" onClick={async () => { await run(() => api.delete('/org/branding/stamp'), 'Company stamp removed'); load() }}>Remove</button>}
+      {st?.configured && <span className="text-slate-500" title={st.sha256}>SHA-256 {st.sha256.slice(0, 16)}... · uploaded by {st.uploaded_by}</span>}
+    </div>
+  </div>
+}
+
 export function SettingsBranding() {
   const { refresh } = useAuth()
   const { data, reload } = useAsync(() => api.get('/org/settings').then((r) => r.data))
@@ -102,6 +122,7 @@ export function SettingsBranding() {
           <div className="flex items-center gap-2 border px-3 py-2" style={{ background: B.primary }}><span className="font-semibold text-white">{B.product_name}</span><span className="px-2 py-1 text-white" style={{ background: B.accent }}>Button</span></div>
         </div>
       </Section>
+      <CompanyStamp />
     </PageShell>)
 }
 
