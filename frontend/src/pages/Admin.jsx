@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import api, { errMsg, fmt, download } from '../api'
 import { useAuth, ROLE_LABEL } from '../auth'
 import { PageShell, Table, Alert, Modal, Field, SBadge, Section, useAsync , ask } from '../components/ui'
@@ -47,25 +47,26 @@ function CompanyStamp() {
   const load = () => api.get('/org/branding/stamp').then(async (r) => {
     setSt(r.data); setImg('')
     if (r.data.configured) { try { const b = await api.get('/org/branding/stamp/image', { responseType: 'blob' }); setImg(URL.createObjectURL(b.data)) } catch { /* preview optional */ } }
-  }).catch(() => {})
+  }).catch((e) => { setSt({ configured: false, error: errMsg(e) }); setImg('') })
   useEffect(() => { load() }, [])
   return <div className="card mt-4 space-y-2">
     <h2>Official company stamp</h2>
     <p className="text-slate-500">Upload the official VAICS stamp/seal (transparent PNG recommended, PNG or JPEG, up to 1 MB). It is placed on Company stamp fields when the VAICS representative signs; signers can never upload their own stamp. Uploads, replacements and removals are recorded in the admin audit log.</p>
-    <Alert>{m.err}</Alert><Alert kind="ok">{m.ok}</Alert>
+    <Alert>{m.err || (st?.error ? `Could not load the company stamp: ${st.error}` : '')}</Alert><Alert kind="ok">{m.ok}</Alert>
     <div className="flex flex-wrap items-center gap-3">
       {img ? <img src={img} alt="company stamp" className="h-20 w-20 border bg-white object-contain p-1" /> : <div className="flex h-20 w-20 items-center justify-center border border-dashed text-center text-[10px] text-slate-400">No stamp</div>}
       <label className="btn-secondary cursor-pointer">{st?.configured ? 'Replace stamp' : 'Upload stamp'}<input hidden type="file" accept="image/png,image/jpeg" onChange={async (e) => { const fd = new FormData(); fd.append('file', e.target.files[0]); e.target.value = ''; await run(() => api.post('/org/branding/stamp', fd), 'Company stamp saved'); load() }} /></label>
       {st?.configured && <button className="btn-secondary" onClick={async () => { await run(() => api.delete('/org/branding/stamp'), 'Company stamp removed'); load() }}>Remove</button>}
-      {st?.configured && <span className="text-slate-500" title={st.sha256}>SHA-256 {st.sha256.slice(0, 16)}... · uploaded by {st.uploaded_by}</span>}
+      {st?.configured && st.sha256 && <span className="text-slate-500" title={st.sha256}>SHA-256 {String(st.sha256).slice(0, 16)}... · uploaded by {st.uploaded_by}</span>}
     </div>
   </div>
 }
 
 export function SettingsBranding() {
   const { refresh } = useAuth()
-  const { data, reload } = useAsync(() => api.get('/org/settings').then((r) => r.data))
+  const { data, err, loading, reload } = useAsync(() => api.get('/org/settings').then((r) => r.data))
   const [m, run] = useMsg(); const [s, setS] = useState(null); const [b, setB] = useState(null); const [o, setO] = useState(null)
+  if (!data && !loading) return <PageShell title="Settings & branding"><Alert>{`Could not load settings: ${typeof err === 'string' ? err : JSON.stringify(err) || 'unknown error'}`}</Alert><button className="btn-secondary mt-2" onClick={reload}>Retry</button></PageShell>
   if (!data) return 'Loading…'
   const S = s || data.settings; const B = b || data.branding; const O = o || data.organization
   const setK = (k, v) => setS({ ...S, [k]: v })
