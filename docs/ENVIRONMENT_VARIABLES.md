@@ -77,3 +77,13 @@ Source of truth: `backend/app/core/config.py` (Settings). `backend/.env.example`
 Compose-level (`/.env.example`): POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, PUBLIC_APP_URL, DEMO_PASSWORD, MINIO_ROOT_PASSWORD.
 Frontend build: `VITE_API_URL` (default `/api/v1`).
 Tests: `TEST_DATABASE_URL` (optional Postgres).
+
+## Local setup summary
+
+- `backend/.env.example` lists every backend variable, grouped by section (placeholders only). Copy it to `backend/.env`.
+- Leave `SMTP_HOST` empty to keep all email in the local outbox; nothing is sent until Amazon SES (ap-south-1) SMTP details are set.
+- Local frontend runs on port 5173; `PUBLIC_APP_URL` and `CORS_ORIGINS` must match it.
+- `frontend/.env.example`: `VITE_API_URL` (default `/api/v1`, proxied to the backend).
+- Retention (default 3650 days) is set in Settings & branding, not in the environment.
+- Portal SSO and SES API keys are reserved for a later phase (commented placeholders in the example).
+
