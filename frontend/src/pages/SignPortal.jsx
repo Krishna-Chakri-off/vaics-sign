@@ -88,6 +88,13 @@ function AdoptModal({ name, initial, allowed, onClose, onAdopt }) {
 }
 
 
+function StampImg({ url, headers, alt }) {
+  const [src, setSrc] = useState(''); const [miss, setMiss] = useState(false)
+  useEffect(() => { let u = ''; pub.get(url, { headers, responseType: 'blob' }).then((r) => { u = URL.createObjectURL(r.data); setSrc(u) }).catch(() => setMiss(true)); return () => { if (u) URL.revokeObjectURL(u) } }, [url]) // eslint-disable-line
+  if (miss) return <span className="m-auto text-[10px] text-slate-500">Company stamp applied</span>
+  return src ? <img src={src} alt={alt} className="h-full w-full object-contain" /> : <span className="m-auto text-[10px] text-slate-400">Loading stamp…</span>
+}
+
 const REASONS = ['I am the author of this document', 'I approve this document', 'I have reviewed this document', 'I agree to the terms of this document', 'I am signing as a witness']
 function ReasonPicker({ value, onChange, onFocus, required }) {
   const [other, setOther] = useState(!!value && !REASONS.includes(value))
@@ -110,7 +117,7 @@ export default function SignPortal() {
   const [sess, setSess] = useState(sessionStorage.getItem(skey) || ''); const [env, setEnv] = useState(null); const [bufs, setBufs] = useState({})
   const [values, setValues] = useState({}); const [reasons, setReasons] = useState({}); const [consent, setConsent] = useState(false); const [intent, setIntent] = useState(false); const [meaning, setMeaning] = useState('Approved'); const [sig, setSig] = useState(null)
   const [adopt, setAdopt] = useState(false); const [done, setDone] = useState(''); const [busy, setBusy] = useState(false); const [focus, setFocus] = useState(null); const [declining, setDeclining] = useState(false)
-  const [, force] = useState(0); const refs = useRef({})
+  const [, force] = useState(0); const refs = useRef({}); const [stamp, setStamp] = useState({ state: 'idle', url: '', msg: '' })
   const H = { headers: { 'X-Signer-Session': sess } }
   useEffect(() => { pub.get(base).then((r) => { setInfo(r.data); if (r.data.recipient.language && !localStorage.getItem('vs_lang')) setLang(r.data.recipient.language); force((x) => x + 1) }).catch((e) => setErr(errMsg(e))) }, [token]) // eslint-disable-line
   useEffect(() => {
@@ -118,7 +125,7 @@ export default function SignPortal() {
     pub.get(`${base}/envelope`, H).then((r) => {
       setEnv(r.data)
       const v = {}; const rs = {}
-      r.data.fields.forEach((f) => { if (f.value != null && f.type !== 'signature') v[f.id] = f.value; else if (f.default_value && !['signature', 'initials'].includes(f.type)) v[f.id] = f.default_value; if (f.reason) rs[f.id] = f.reason })
+      r.data.fields.forEach((f) => { if (f.type === 'stamp') return; if (f.value != null && f.type !== 'signature') v[f.id] = f.value; else if (f.default_value && !['signature', 'initials'].includes(f.type)) v[f.id] = f.default_value; if (f.reason) rs[f.id] = f.reason })
       setValues(v); setReasons(rs)
       r.data.documents.forEach((d) => fetchBuf(`${base}/documents/${d.id}`, pub, H.headers).then((b) => setBufs((x) => ({ ...x, [d.id]: b }))).catch(() => {}))
     }).catch((e) => { if ([401, 403].includes(e?.response?.status)) { sessionStorage.removeItem(skey); setSess(''); setErr(errMsg(e)) } else setErr(errMsg(e)) })
@@ -134,19 +141,26 @@ export default function SignPortal() {
     if (!active(f) || f.read_only || AUTO.includes(f.type)) return false
     if (f.type === 'signature') return !sig || (f.reason_required && !(reasons[f.id] || '').trim())
     if (f.type === 'initials') return !sig
+    if (f.type === 'stamp') return stamp.state !== 'ok'
     return f.required && !(values[f.id] ?? '').toString().trim()
   }
   const pending = fields.filter(needs)
   const order = useMemo(() => [...fields].sort((a, b) => (a.document_id - b.document_id) || (a.page - b.page) || (a.y - b.y) || (a.x - b.x)), [fields])
+  const applyStamp = async () => {
+    if (stamp.state === 'ok' || stamp.state === 'loading') return
+    setStamp({ state: 'loading', url: '', msg: '' })
+    try { const r = await pub.get(`${base}/company-stamp`, { headers: H.headers, responseType: 'blob' }); setStamp({ state: 'ok', url: URL.createObjectURL(r.data), msg: '' }) }
+    catch (e) { const st = e?.response?.status; setStamp({ state: 'missing', url: '', msg: st === 404 ? 'No official company stamp is configured. Ask your VAICS admin to upload it in Settings, then reopen this link.' : st === 403 ? 'Only an internal VAICS signer can apply the company stamp.' : 'Could not load the company stamp. Click to try again.' }) }
+  }
   const goNext = () => {
     const f = order.find(needs) || order[0]; if (!f) return; setFocus(f.id)
     const el = refs.current[f.id]; el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    if (['signature', 'initials'].includes(f.type) && !sig) setAdopt(true); else setTimeout(() => el?.querySelector('input,select')?.focus(), 400)
+    if (['signature', 'initials'].includes(f.type) && !sig) setAdopt(true); else if (f.type === 'stamp') applyStamp(); else setTimeout(() => el?.querySelector('input,select')?.focus(), 400)
   }
   const finish = async () => {
     setErr(''); setBusy(true)
     try {
-      const r = await pub.post(`${base}/finish`, { consent, intent, signature_meaning: meaning, signature: sig || { kind: 'typed' }, values, reasons }, H)
+      const r = await pub.post(`${base}/finish`, { consent, intent, signature_meaning: meaning, signature: sig || { kind: 'typed' }, values: Object.fromEntries(Object.entries(values).filter(([k]) => fields.find((x) => String(x.id) === k)?.type !== 'stamp')), reasons }, H)
       sessionStorage.removeItem(skey); setDone(r.data.completed ? t('thanksDone') : t('thanksNext'))
     } catch (e) { setErr(errMsg(e)) } finally { setBusy(false) }
   }
@@ -161,7 +175,10 @@ export default function SignPortal() {
   const input = (f) => {
     const set = (v) => setValues({ ...values, [f.id]: v }); const v = values[f.id] ?? ''
     const cls = 'h-full w-full bg-transparent px-1 text-[11px] outline-none focus:bg-white'
-    if (f.type === 'stamp') return <div className="flex h-full items-center justify-center px-1 text-center text-[10px] text-slate-600">Official company stamp is applied when you finish</div>
+    if (f.type === 'stamp') return stamp.state === 'ok'
+      ? <div className="flex h-full w-full items-center justify-center p-0.5"><img src={stamp.url} alt="Official company stamp" className="max-h-full max-w-full object-contain" /></div>
+      : <button type="button" className="flex h-full w-full flex-col items-center justify-center px-1 text-center text-[10px] leading-tight" onClick={applyStamp}>
+        {stamp.state === 'missing' ? <span className="font-medium text-red-700">{stamp.msg}</span> : <span className="font-medium text-[#E6007E]">{stamp.state === 'loading' ? 'Applying stamp…' : 'Click to apply company stamp'}</span>}</button>
     if (f.read_only) return <div className="px-1 text-[11px]">{v}</div>
     if (f.type === 'checkbox') return <input type="checkbox" className="m-auto block h-full" checked={v === 'true'} onChange={(e) => set(e.target.checked ? 'true' : '')} />
     if (f.type === 'radio') return <select className={cls} value={v} onChange={(e) => set(e.target.value)}><option value="">—</option>{(f.options || []).map((o) => <option key={o}>{o}</option>)}</select>
@@ -178,7 +195,8 @@ export default function SignPortal() {
           ? <img src={f.signature_image} alt={`Signature of ${f.by}`} className="h-full max-h-[64px] w-full object-contain object-left" />
           : <span className={`sig-${f.signature_style || 'great_vibes'} truncate leading-tight text-black`} style={{ fontSize: f.type === 'initials' ? 'clamp(12px, 2vw, 22px)' : 'clamp(14px, 2.4vw, 26px)' }}>{f.type === 'initials' ? f.by.split(/\s+/).map((p) => p[0]).join('').toUpperCase() : f.by}</span>}</div>
         {f.type === 'signature' && <div className="px-1 pb-0.5 text-[9px] leading-tight text-slate-600">Name: {f.by}{f.reason ? <><br />Reason: {f.reason}</> : null}<br />Signed: {f.signed_at ? new Date(f.signed_at.endsWith('Z') ? f.signed_at : `${f.signed_at}Z`).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', dateStyle: 'medium', timeStyle: 'medium' }) + ' IST' : '-'}</div>}
-      </> : <div className="flex h-full items-center px-1 text-[11px]">{f.type === 'checkbox' ? (['true', '1', 'yes', 'on', 'X'].includes(f.value) ? '✓' : '') : `${f.value ?? ''}`}</div>}
+      </> : f.type === 'stamp' ? <div className="flex h-full w-full p-0.5"><StampImg url={`${base}/company-stamp/applied/${f.id}`} headers={H.headers} alt={`Company stamp applied by ${f.by}`} /></div>
+        : <div className="flex h-full items-center px-1 text-[11px]">{f.type === 'checkbox' ? (['true', '1', 'yes', 'on', 'X'].includes(f.value) ? '✓' : '') : `${f.value ?? ''}`}</div>}
       <span className="absolute right-0 top-0 bg-slate-600 px-1 text-[8px] uppercase tracking-wide text-white">Signed · {f.by}</span>
     </div>)}
     {fields.filter((f) => f.document_id === docId && f.page === page && active(f)).map((f) => {

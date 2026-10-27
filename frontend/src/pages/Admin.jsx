@@ -65,21 +65,16 @@ function CompanyStamp() {
 export function SettingsBranding() {
   const { refresh } = useAuth()
   const { data, err, loading, reload } = useAsync(() => api.get('/org/settings').then((r) => r.data))
-  const [m, run] = useMsg(); const [s, setS] = useState(null); const [b, setB] = useState(null); const [o, setO] = useState(null)
-  if (!data && !loading) return <PageShell title="Settings & branding"><Alert>{`Could not load settings: ${typeof err === 'string' ? err : JSON.stringify(err) || 'unknown error'}`}</Alert><button className="btn-secondary mt-2" onClick={reload}>Retry</button></PageShell>
+  const [m, run] = useMsg(); const [s, setS] = useState(null); const [o, setO] = useState(null)
+  if (!data && !loading) return <PageShell title="Settings"><Alert>{`Could not load settings: ${typeof err === 'string' ? err : JSON.stringify(err) || 'unknown error'}`}</Alert><button className="btn-secondary mt-2" onClick={reload}>Retry</button></PageShell>
   if (!data) return 'Loading…'
-  const S = s || data.settings; const B = b || data.branding; const O = o || data.organization
+  const S = s || data.settings; const O = o || data.organization
   const setK = (k, v) => setS({ ...S, [k]: v })
   const toggle = (k, v) => setK(k, S[k].includes(v) ? S[k].filter((x) => x !== v) : [...S[k], v])
   return (
-    <PageShell title="Settings & branding" subtitle={`Organization ${O.name} · data region ${O.region.toUpperCase()}`}>
+    <PageShell title="Settings" subtitle={`Organization ${O.name} · data region ${O.region.toUpperCase()}`}>
       <Alert>{m.err}</Alert><Alert kind="ok">{m.ok}</Alert>
       <div className="grid gap-4 lg:grid-cols-2">
-        <Section title="Organization">
-          <div className="grid gap-2 sm:grid-cols-2">
-            <Field label="Organization name"><input className="input" value={O.name} onChange={(e) => setO({ ...O, name: e.target.value })} /></Field>
-          </div>
-        </Section>
         <Section title="Signing defaults">
           <div className="grid gap-2 sm:grid-cols-2">
             <Field label="Envelope expiry (days)"><input className="input" type="number" value={S.envelope_expiry_days} onChange={(e) => setK('envelope_expiry_days', +e.target.value)} /></Field>
@@ -108,21 +103,6 @@ export function SettingsBranding() {
         </Section>
       </div>
       <button className="btn-primary" onClick={() => run(() => api.put('/org/settings', { settings: S, organization: O }), 'Settings saved').then(() => { setS(null); setO(null); reload(); refresh() })}>Save settings</button>
-      <Section title="Branding (emails, signing page, certificate)" >
-        <div className="grid gap-2 sm:grid-cols-3">
-          <Field label="Product name"><input className="input" value={B.product_name || ''} onChange={(e) => setB({ ...B, product_name: e.target.value })} /></Field>
-          <Field label="Primary colour"><input className="input" type="color" value={B.primary || '#0D47A1'} onChange={(e) => setB({ ...B, primary: e.target.value.toUpperCase() })} /></Field>
-          <Field label="Accent colour"><input className="input" type="color" value={B.accent || '#E6007E'} onChange={(e) => setB({ ...B, accent: e.target.value.toUpperCase() })} /></Field>
-          <Field label="Reply-to email"><input className="input" value={B.reply_to || ''} onChange={(e) => setB({ ...B, reply_to: e.target.value })} /></Field>
-          <Field label="Email footer" className="sm:col-span-2"><input className="input" value={B.email_footer || ''} onChange={(e) => setB({ ...B, email_footer: e.target.value })} /></Field>
-        </div>
-        <div className="mt-2 flex flex-wrap items-center gap-3">
-          <img src={B.logo_url || '/vaics-logo-full.png'} alt="logo" className="h-10 border bg-white p-1" />
-          <label className="btn-secondary cursor-pointer">Upload logo (PNG/JPEG, ≤512 KB)<input hidden type="file" accept="image/png,image/jpeg" onChange={async (e) => { const fd = new FormData(); fd.append('file', e.target.files[0]); await run(() => api.post('/org/branding/logo', fd), 'Logo updated'); reload() }} /></label>
-          <button className="btn-primary" onClick={() => run(() => api.put('/org/branding', { product_name: B.product_name, primary: B.primary, accent: B.accent, email_footer: B.email_footer, reply_to: B.reply_to || null }), 'Branding saved').then(() => { setB(null); reload() })}>Save branding</button>
-          <div className="flex items-center gap-2 border px-3 py-2" style={{ background: B.primary }}><span className="font-semibold text-white">{B.product_name}</span><span className="px-2 py-1 text-white" style={{ background: B.accent }}>Button</span></div>
-        </div>
-      </Section>
       <CompanyStamp />
     </PageShell>)
 }

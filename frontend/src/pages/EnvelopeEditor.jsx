@@ -150,7 +150,7 @@ export default function EnvelopeEditor({ env, reload }) {
           <div className="card space-y-2">
             <h2>3 · Fields</h2>
             <p className="text-slate-500">Select a recipient, pick a field type, then <b>click</b> (or tap) the page to drop it or <b>drag</b> to draw it. Drag to move, corner to resize.</p>
-            {fs.some((f) => f.type === 'stamp') && stampOk === false && <div className="border border-amber-300 bg-amber-50 p-2 text-amber-900">No official company stamp is configured. An org admin must upload it in Settings &amp; branding before this envelope can be sent.</div>}
+            {fs.some((f) => f.type === 'stamp') && stampOk === false && <div className="border border-amber-300 bg-amber-50 p-2 text-amber-900">No official company stamp is configured. An org admin must upload it in Settings before this envelope can be sent.</div>}
             <div className="flex flex-wrap gap-1">{FIELD_TYPES.filter(([v]) => PALETTE.includes(v)).map(([v, l]) => <button key={v} className={`border px-2 py-1 ${ftype === v ? 'border-[#0D47A1] bg-[#0D47A1] text-white' : 'border-gray-300 bg-white'}`} onClick={() => setFtype(v)}>{l}</button>)}</div>
             {sf && <div className="space-y-1 border border-[#B8D0E8] bg-[#F2F8FF] p-2">
               <b>Selected: {FT[sf.type][1]} · {rs[sf.ri]?.name}</b>

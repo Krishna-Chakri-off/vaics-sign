@@ -148,3 +148,49 @@ def test_in_flight_removed_stamp_blocks_and_replaced_uses_current(client):
         assert next(x for x in env.fields if x.type == "stamp").value == f"sha256:{sha256_hex(new)}"
         ev = s.query(models.AuditEvent).filter_by(envelope_id=eid, event="company_stamp_applied").all()
         assert len(ev) == 1 and sha256_hex(new) in ev[0].detail
+
+
+def test_signer_stamp_preview_and_full_finish(client):
+    from app.core.security import sha256_hex
+    h = signup(client)
+    img = png()
+    eid = stamp_draft(client, h)
+    client.post("/api/v1/org/branding/stamp", files={"file": ("s.png", img, "image/png")}, headers=h)
+    assert client.post(f"/api/v1/envelopes/{eid}/send", headers=h).status_code == 200
+    tok, code = link_and_code("krishna@example.com")
+    assert client.get(f"/api/v1/public/s/{tok}/company-stamp").status_code in (401, 403)  # needs signer session
+    sh = {"X-Signer-Session": client.post(f"/api/v1/public/s/{tok}/unlock", json={"code": code}).json()["session"]}
+    r = client.get(f"/api/v1/public/s/{tok}/company-stamp", headers=sh)
+    assert r.status_code == 200 and r.content == img and r.headers["content-type"] == "image/png"
+    fl = client.get(f"/api/v1/public/s/{tok}/envelope", headers=sh).json()["fields"]
+    stamp_id = next(f["id"] for f in fl if f["type"] == "stamp")
+    # save cannot put signer content into the stamp field
+    client.post(f"/api/v1/public/s/{tok}/save", json={"values": {stamp_id: "fake"}}, headers=sh)
+    with SessionLocal() as s:
+        assert s.get(models.Field, stamp_id).value is None
+    reasons = {f["id"]: "I approve this document" for f in fl if f["type"] == "signature"}
+    r = client.post(f"/api/v1/public/s/{tok}/finish", json={"consent": True, "intent": True, "signature": {"kind": "typed"}, "reasons": reasons, "values": {}}, headers=sh)
+    assert r.status_code == 200, r.text
+    # countersigner: cannot fetch the live stamp, but sees the applied one
+    tok2, code2 = link_and_code("client@example.org")
+    sh2 = {"X-Signer-Session": client.post(f"/api/v1/public/s/{tok2}/unlock", json={"code": code2}).json()["session"]}
+    assert client.get(f"/api/v1/public/s/{tok2}/company-stamp", headers=sh2).status_code == 403
+    done = client.get(f"/api/v1/public/s/{tok2}/envelope", headers=sh2).json()["completed_fields"]
+    sf = next(f for f in done if f["type"] == "stamp")
+    assert sf["value"] == f"sha256:{sha256_hex(img)}"
+    assert client.get(f"/api/v1/public/s/{tok2}/company-stamp/applied/{sf['id']}", headers=sh2).content == img
+    reasons2 = {f["id"]: "I agree to the terms of this document" for f in client.get(f"/api/v1/public/s/{tok2}/envelope", headers=sh2).json()["fields"] if f["type"] == "signature"}
+    r = client.post(f"/api/v1/public/s/{tok2}/finish", json={"consent": True, "intent": True, "signature": {"kind": "typed"}, "reasons": reasons2}, headers=sh2)
+    assert r.status_code == 200 and r.json()["completed"]
+
+
+def test_signer_stamp_preview_404_when_not_configured(client):
+    h = signup(client)
+    client.post("/api/v1/org/branding/stamp", files={"file": ("s.png", png(), "image/png")}, headers=h)
+    eid = stamp_draft(client, h)
+    assert client.post(f"/api/v1/envelopes/{eid}/send", headers=h).status_code == 200
+    client.delete("/api/v1/org/branding/stamp", headers=h)
+    tok, code = link_and_code("krishna@example.com")
+    sh = {"X-Signer-Session": client.post(f"/api/v1/public/s/{tok}/unlock", json={"code": code}).json()["session"]}
+    r = client.get(f"/api/v1/public/s/{tok}/company-stamp", headers=sh)
+    assert r.status_code == 404 and "Settings" in r.text

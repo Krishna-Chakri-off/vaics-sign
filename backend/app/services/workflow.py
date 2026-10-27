@@ -91,7 +91,7 @@ def validate_send(env: Envelope, org) -> None:
     if any(f.type == "stamp" for f in env.fields):
         from . import companystamp
         from ..core.db import SessionLocal
-        if not companystamp.meta(org): errs.append("No official company stamp is configured. An org admin must upload it in Settings & branding, or remove the Company stamp field")
+        if not companystamp.meta(org): errs.append("No official company stamp is configured. An org admin must upload it in Settings, or remove the Company stamp field")
         from sqlalchemy.orm import object_session
         sdb = object_session(env)
         for r in {f.recipient_id: next(x for x in env.recipients if x.id == f.recipient_id) for f in env.fields if f.type == "stamp"}.values():

@@ -39,7 +39,7 @@ export default function Layout() {
     ['VAICS Sign', [['/', 'Dashboard', FiGrid], ['/envelopes', 'Envelopes', FiInbox], can('envelopes.send') && ['/envelopes/new', 'New envelope', FiEdit3],
       ['/templates', 'Templates', FiLayers], can('bulk.send') && ['/bulk', 'Bulk send', FiUpload], ['/outbox', 'Email outbox', FiMail]]],
     ['Insights', [can('reports.view') && ['/reports', 'Reports', FiBarChart2], ['/verify', 'Verify a document', FiCheckCircle]]],
-    ['Administration', [can('users.manage') && ['/admin/users', 'Users & groups', FiUsers], can('settings.manage') && ['/admin/settings', 'Settings & branding', FiSettings],
+    ['Administration', [can('users.manage') && ['/admin/users', 'Users & groups', FiUsers], can('settings.manage') && ['/admin/settings', 'Settings', FiSettings],
       (can('audit.view') && user.role !== 'sender') && ['/admin/audit', 'Admin audit log', FiShield],
       can('privacy.manage') && ['/admin/privacy', 'Privacy & retention', FiShield], ['/account', 'My account', FiUser]]],
   ]
@@ -61,7 +61,7 @@ export default function Layout() {
     <aside className="flex h-full flex-col overflow-hidden border-r border-blue-200 bg-white">
       <div className={`px-2 pt-2 ${collapsed ? 'pb-14' : 'pb-2 pr-10'}`}>
         {collapsed ? <img src={theme.logoIcon} alt="VAICS" className="round mx-auto h-10 w-10" />
-          : <><img src={theme.logoFull} alt="VAICS" className="h-12 w-[168px] object-contain object-left" /><p className="mt-0.5 ml-0.5 truncate font-medium tracking-wide">{theme.appName}</p></>}
+          : <img src={theme.logoFull} alt="VAICS" className="h-12 w-[168px] object-contain object-left" />}
       </div>
       <nav className="flex-1 space-y-3 overflow-y-auto px-2 py-2">
         {groups.map(([g, links]) => (

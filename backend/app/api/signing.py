@@ -107,6 +107,33 @@ def document(tok: str, doc_id: int, x_signer_session: str | None = Header(None),
     return Response(wf.doc_bytes(org, d), media_type="application/pdf", headers={"Cache-Control": "no-store", "Content-Disposition": f'inline; filename="{d.name}"'})
 
 
+def _img_mime(data: bytes) -> str:
+    return "image/png" if data[:8] == b"\x89PNG\r\n\x1a\n" else "image/jpeg"
+
+
+@router.get("/s/{tok}/company-stamp")
+def company_stamp_preview(tok: str, x_signer_session: str | None = Header(None), db: Session = Depends(get_db)):
+    """Preview of the official stamp for a signer who owns a Company stamp field (read-only; the server still applies it on finish)."""
+    from ..services import companystamp
+    org, env, r = _sess(db, tok, x_signer_session)
+    if not any(f.type == "stamp" and f.recipient_id == r.id for f in env.fields): raise HTTPException(403, "No company stamp field is assigned to you")
+    if not companystamp.is_internal(db, org, r): raise HTTPException(403, "Only an internal VAICS signer can apply the company stamp")
+    cur = companystamp.current_image(org)
+    if not cur: raise HTTPException(404, "No official company stamp is configured. Ask your VAICS admin to upload it in Settings.")
+    return Response(cur[1], media_type=_img_mime(cur[1]), headers={"Cache-Control": "no-store", "X-Stamp-Sha256": cur[0]})
+
+
+@router.get("/s/{tok}/company-stamp/applied/{field_id}")
+def company_stamp_applied(tok: str, field_id: int, x_signer_session: str | None = Header(None), db: Session = Depends(get_db)):
+    """The stamp image already applied on a completed field of this envelope (shown to later signers)."""
+    from ..services import companystamp
+    org, env, r = _sess(db, tok, x_signer_session)
+    f = next((x for x in env.fields if x.id == field_id and x.type == "stamp" and x.signed_at), None)
+    if not f or not str(f.value or "").startswith("sha256:"): raise HTTPException(404, "Stamp not found")
+    data = companystamp.load_applied(org, env.id, f.value.split(":", 1)[1])
+    return Response(data, media_type=_img_mime(data), headers={"Cache-Control": "no-store"})
+
+
 class SaveIn(BaseModel):
     values: dict[int, str] = {}
     reasons: dict[int, str] = {}
@@ -118,7 +145,7 @@ def save_progress(tok: str, body: SaveIn, request: Request, x_signer_session: st
     org, env, r = _sess(db, tok, x_signer_session)
     mine = {f.id: f for f in env.fields if f.recipient_id == r.id}
     for k, v in body.values.items():
-        if k in mine and mine[k].type not in ("signature", "initials", "date_signed", "name", "email"): mine[k].value = v
+        if k in mine and mine[k].type not in ("signature", "initials", "date_signed", "name", "email", "stamp"): mine[k].value = v
     for k, v in body.reasons.items():
         if k in mine and mine[k].type == "signature": mine[k].reason = v[:200]
     audit.record(db, env, "progress_saved", r.email, request, f"{len(body.values)} value(s)", r)
