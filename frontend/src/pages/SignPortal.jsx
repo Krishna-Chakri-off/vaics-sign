@@ -87,6 +87,22 @@ function AdoptModal({ name, initial, allowed, onClose, onAdopt }) {
   </Modal>
 }
 
+
+const REASONS = ['I am the author of this document', 'I approve this document', 'I have reviewed this document', 'I agree to the terms of this document', 'I am signing as a witness']
+function ReasonPicker({ value, onChange, onFocus, required }) {
+  const [other, setOther] = useState(!!value && !REASONS.includes(value))
+  const sel = other ? '__other' : (REASONS.includes(value) ? value : '')
+  const cls = 'w-full border-t border-[#CBD5E1] bg-[#F2F8FF] px-1 py-0.5 text-[11px] outline-none focus:bg-white'
+  return <>
+    <select className={cls} value={sel} onFocus={onFocus} aria-label="Reason for signing" onChange={(e) => { const v = e.target.value; if (v === '__other') { setOther(true); onChange('') } else { setOther(false); onChange(v) } }}>
+      <option value="" disabled>{required ? 'Select reason for signing *' : 'Reason (optional)'}</option>
+      {REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
+      <option value="__other">Other…</option>
+    </select>
+    {other && <input className={cls} autoFocus maxLength={200} required placeholder="Type your reason (max 200 characters) *" value={value} onFocus={onFocus} onChange={(e) => onChange(e.target.value)} />}
+  </>
+}
+
 export default function SignPortal() {
   const { token } = useParams(); const [q] = useSearchParams(); const nav = useNavigate(); const kiosk = q.get('kiosk') === '1'
   const base = `/public/s/${token}`; const skey = `vs_${token}`
@@ -173,7 +189,7 @@ export default function SignPortal() {
         {f.type === 'signature' ? <>
           <button className="flex flex-1 items-center px-1 text-left" onClick={() => !sig && setAdopt(true)}>{sig ? sigMark(f) : <span className="text-[11px] font-medium tracking-wide text-[#E6007E]">✎ Sign here</span>}</button>
           <div className="px-1 text-[9px] leading-tight text-slate-600">Name: {name}<br />{sig ? nowStamp() : 'Timestamp & SHA-256 added on signing'}</div>
-          <input className="w-full border-t border-[#CBD5E1] bg-[#F2F8FF] px-1 py-0.5 text-[11px] outline-none focus:bg-white" placeholder={f.reason_required ? t('reason') : 'Reason (optional)'} value={reasons[f.id] || ''} onFocus={() => setFocus(f.id)} onChange={(e) => setReasons({ ...reasons, [f.id]: e.target.value })} />
+          <ReasonPicker required={f.reason_required} value={reasons[f.id] || ''} onFocus={() => setFocus(f.id)} onChange={(v) => setReasons({ ...reasons, [f.id]: v })} />
         </> : f.type === 'initials' ? <button className="flex h-full items-center justify-center" onClick={() => !sig && setAdopt(true)}>{sig ? sigMark(f) : <span className="text-[10px] font-medium text-[#E6007E]">Initial here</span>}</button>
           : AUTO.includes(f.type) ? <div className="px-1 text-[11px] text-slate-600">{f.type === 'name' ? name : f.type === 'email' ? env.recipient.email : f.type === 'date_signed' ? new Date().toLocaleDateString('en-IN') : 'calculated'}</div>
             : input(f)}
@@ -215,7 +231,7 @@ export default function SignPortal() {
               {sig && <div className="flex items-center gap-2 text-slate-500">Adopted signature: {sig.kind} {sig.kind === 'typed' && `(${sig.style})`} <button className="text-[#0D47A1]" onClick={() => setAdopt(true)}>Change</button></div>}
             </div>
             {(env.message || env.private_message) && <div className="card border-l-4 border-l-[#E6007E] whitespace-pre-line">{[env.message, env.private_message].filter(Boolean).join('\n\n')}</div>}
-            <p className="text-slate-500">Click <b>{t('start')}</b> to be guided through each field. Enter a reason under every signature, tick the consent and signature-intent boxes, then <b>{t('finish')}</b>. Each signature is stamped with your name, reason, IST and UTC time and a SHA-256 hash.</p>
+            <p className="text-slate-500">Click <b>{t('start')}</b> to be guided through each field. Select a reason under every signature, tick the consent and signature-intent boxes, then <b>{t('finish')}</b>. Each signature is stamped with your name, reason, IST and UTC time and a SHA-256 hash.</p>
             {env.documents.map((d) => <div key={d.id} className="space-y-2">{env.documents.length > 1 && <h2>{d.name}</h2>}{bufs[d.id] ? <PdfPages data={bufs[d.id]} overlay={overlay(d.id)} /> : 'Loading document…'}</div>)}
           </>}
       {adopt && <AdoptModal name={name} initial={sig || {}} allowed={info?.allowed_signature_kinds || ['typed', 'drawn', 'uploaded']} onClose={() => setAdopt(false)} onAdopt={(s) => { setSig(s); setAdopt(false) }} />}
