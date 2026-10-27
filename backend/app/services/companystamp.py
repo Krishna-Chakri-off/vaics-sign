@@ -1,4 +1,5 @@
-"""Official company stamp/seal image: admin-uploaded, stored server-side by SHA-256 (versions kept so in-flight envelopes stamp the exact image recorded at signing)."""
+"""Official company stamp/seal image: admin-uploaded, stored server-side by SHA-256. Only the current image is kept; replace/remove deletes old files.
+When the VAICS representative signs, the verified image is copied into that envelope's evidence so the final PDF uses exactly what was applied."""
 from fastapi import HTTPException
 from ..core.security import sha256_hex
 from ..models import User, now
@@ -35,7 +36,10 @@ def save(org, data: bytes, actor_email: str) -> dict:
     except Exception:
         raise HTTPException(415, "Stamp image could not be read")
     sha = sha256_hex(data)
+    prev = meta(org)
     storage().put(org.region, _key(org, sha), data)
+    if prev and prev["sha256"] != sha:
+        storage().delete(org.region, _key(org, prev["sha256"]))
     m = {"sha256": sha, "mime": mime, "size": len(data), "uploaded_by": actor_email, "uploaded_at": now().isoformat() + "Z"}
     org.settings = {**(org.settings or {}), "company_stamp": m}
     return m
@@ -44,7 +48,43 @@ def save(org, data: bytes, actor_email: str) -> dict:
 def remove(org) -> dict | None:
     m = meta(org)
     s = dict(org.settings or {}); s.pop("company_stamp", None); org.settings = s
-    return m  # the stored image is kept: envelopes signed with it must still render and verify
+    if m: storage().delete(org.region, _key(org, m["sha256"]))
+    _purge_leftovers(org)
+    return m
+
+
+def _purge_leftovers(org):
+    """Delete any other stamp library files for this org (e.g. versions kept by older builds)."""
+    import os, glob
+    root = getattr(storage(), "root", None)
+    if root:
+        for p in glob.glob(os.path.join(root, org.region, str(org.id), "stamp", "*.img")):
+            os.chmod(p, 0o644); os.remove(p)
+
+
+def current_image(org) -> tuple[str, bytes] | None:
+    """The configured stamp, verified against its SHA-256; None if not configured, missing or mismatched."""
+    m = meta(org)
+    if not m: return None
+    try:
+        data = load(org, m["sha256"])
+    except Exception:
+        return None
+    return m["sha256"], data
+
+
+def _env_key(org, env_id: int, sha: str) -> str:
+    return f"{org.region}/{org.id}/envstamp/{env_id}/{sha}.img"
+
+
+def snapshot(org, env_id: int, sha: str, data: bytes) -> None:
+    storage().put(org.region, _env_key(org, env_id, sha), data)
+
+
+def load_applied(org, env_id: int, sha: str) -> bytes:
+    data = storage().get(org.region, _env_key(org, env_id, sha))
+    if sha256_hex(data) != sha: raise RuntimeError("Applied company stamp failed its integrity check")
+    return data
 
 
 def load(org, sha: str) -> bytes:

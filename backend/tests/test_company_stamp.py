@@ -97,3 +97,54 @@ def test_stamp_applied_into_pdf_and_audited(client):
             if o.get("/Subtype") == "/Form" and "/Resources" in o and has_img(o["/Resources"].get("/XObject") or {}): return True
         return False
     assert has_img(xo)
+
+
+def _stamp_files():
+    import os, glob
+    from app.core.config import settings
+    return glob.glob(os.path.join(os.path.abspath(settings.STORAGE_DIR), "*", "*", "stamp", "*.img"))
+
+
+def test_replace_and_remove_delete_files(client):
+    h = signup(client)
+    client.post("/api/v1/org/branding/stamp", files={"file": ("s.png", png(), "image/png")}, headers=h)
+    assert len(_stamp_files()) == 1
+    client.post("/api/v1/org/branding/stamp", files={"file": ("s.png", png((0, 0, 200, 255)), "image/png")}, headers=h)
+    assert len(_stamp_files()) == 1
+    assert client.delete("/api/v1/org/branding/stamp", headers=h).status_code == 200
+    assert _stamp_files() == []
+    with SessionLocal() as s:
+        logs = [a for a in s.query(models.AdminAuditLog).order_by(models.AdminAuditLog.id) if "stamp" in a.action]
+    assert len(logs) == 3 and logs[-1].before["sha256"]
+
+
+def _rep_finish(client, eid):
+    tok, code = link_and_code("krishna@example.com")
+    r = client.post(f"/api/v1/public/s/{tok}/unlock", json={"code": code}); sh = {"X-Signer-Session": r.json()["session"]}
+    fl = client.get(f"/api/v1/public/s/{tok}/envelope", headers=sh).json()["fields"]
+    reasons = {f["id"]: "Approved" for f in fl if f["type"] == "signature"}
+    return client.post(f"/api/v1/public/s/{tok}/finish", json={"consent": True, "intent": True, "signature": {"kind": "typed"}, "reasons": reasons}, headers=sh)
+
+
+def test_in_flight_removed_stamp_blocks_and_replaced_uses_current(client):
+    from app.core.security import sha256_hex
+    h = signup(client)
+    client.post("/api/v1/org/branding/stamp", files={"file": ("s.png", png(), "image/png")}, headers=h)
+    eid = stamp_draft(client, h)
+    assert client.post(f"/api/v1/envelopes/{eid}/send", headers=h).status_code == 200
+    client.delete("/api/v1/org/branding/stamp", headers=h)
+    r = _rep_finish(client, eid)
+    assert r.status_code == 422 and "Company stamp not configured" in r.text
+    new = png((0, 120, 0, 255))
+    client.post("/api/v1/org/branding/stamp", files={"file": ("s.png", new, "image/png")}, headers=h)
+    assert _rep_finish(client, eid).status_code == 200
+    # admin removes the stamp after the representative signed: the applied copy still finalizes the envelope
+    client.delete("/api/v1/org/branding/stamp", headers=h)
+    tok2, code2 = link_and_code("client@example.org")
+    sign(client, tok2, code2)
+    with SessionLocal() as s:
+        env = s.get(models.Envelope, eid)
+        assert env.status == "completed"
+        assert next(x for x in env.fields if x.type == "stamp").value == f"sha256:{sha256_hex(new)}"
+        ev = s.query(models.AuditEvent).filter_by(envelope_id=eid, event="company_stamp_applied").all()
+        assert len(ev) == 1 and sha256_hex(new) in ev[0].detail

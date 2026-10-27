@@ -354,8 +354,9 @@ def complete_recipient(db, org, env, r: Recipient, payload: dict, req, actor_ema
     stamp_meta = None
     if any(f.type == "stamp" for f in my):
         from . import companystamp
-        stamp_meta = companystamp.meta(org)
-        if not stamp_meta: errors.append("The official company stamp is not configured; ask your administrator")
+        stamp_cur = companystamp.current_image(org)
+        stamp_meta = {"sha256": stamp_cur[0]} if stamp_cur else None
+        if not stamp_meta: errors.append("Company stamp not configured; ask your admin to upload it")
         elif not companystamp.is_internal(db, org, r): errors.append("Only an internal VAICS signer can apply the company stamp")
     ts = now()
     for f in my:
@@ -389,6 +390,8 @@ def complete_recipient(db, org, env, r: Recipient, payload: dict, req, actor_ema
             f.value = v if active else None
     if errors:
         raise HTTPException(422, {"code": "invalid_fields", "errors": sorted(set(errors)), "message": "; ".join(sorted(set(errors)))})
+    if stamp_meta:
+        companystamp.snapshot(org, env.id, stamp_cur[0], stamp_cur[1])
     vals = {f.id: f.value for f in env.fields}
     for f in my:
         if f.type == "formula" and f.formula:
@@ -505,9 +508,9 @@ def correct(db, org, env, user, data: dict, req):
 
 
 # ---------------- finalization ----------------
-def _stamp_loader(org):
+def _stamp_loader(org, env):
     from . import companystamp
-    return lambda sha: companystamp.load(org, sha)
+    return lambda sha: companystamp.load_applied(org, env.id, sha)
 
 
 def finalize(db, org, env, req=None):
@@ -520,7 +523,7 @@ def finalize(db, org, env, req=None):
     env.status = "completed"
     stamped = []
     for d in env.documents:
-        stamped.append(pdfstamp.stamp_document(doc_bytes(org, d), [f for f in env.fields if f.document_id == d.id], rmap, s["timezone"], brand, stamp_loader=_stamp_loader(org)))
+        stamped.append(pdfstamp.stamp_document(doc_bytes(org, d), [f for f in env.fields if f.document_id == d.id], rmap, s["timezone"], brand, stamp_loader=_stamp_loader(org, env)))
     audit.record(db, env, "completed", "system", req, f"all {len([r for r in env.recipients if r.type in ACTING])} recipient(s) completed")
     mode = sealmod.seal_mode()
     note = {"no": "This PDF is NOT sealed with a PAdES signature (no seal certificate configured).",
