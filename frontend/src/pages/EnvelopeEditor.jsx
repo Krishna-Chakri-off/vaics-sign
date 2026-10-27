@@ -180,14 +180,16 @@ export default function EnvelopeEditor({ env, reload }) {
               <Field label="Repeat every (days)"><input className="input" type="number" min={0} value={rem.every} onChange={(e) => setRem({ ...rem, every: e.target.value })} /></Field>
             </div>
             <Field label="Labels (comma separated)"><input className="input" value={labels} onChange={(e) => setLabels(e.target.value)} /></Field>
-            <div className="flex gap-2"><button className="btn-secondary" onClick={() => save()}>Save draft</button><button className="btn-accent flex-1" disabled={busy} onClick={() => setConfirmSend(true)}>Generate & send</button></div>
-            <p className="text-slate-500">Generate emails the first recipient(s) a signing link and, separately, an access code. Later recipients are notified only when it is their turn.</p>
           </div>
         </div>
         <div className="card overflow-x-auto bg-[#F2F8FF]">
           {env.documents.length > 1 && <div className="mb-3 flex flex-wrap gap-1">{env.documents.map((d) => <button key={d.id} className={`border px-2 py-1 ${doc === d.id ? 'border-[#0D47A1] bg-[#0D47A1] text-white' : 'border-gray-300 bg-white'}`} onClick={() => setDoc(d.id)}>{d.name}</button>)}</div>}
           {!env.documents.length ? <div className="py-20 text-center text-slate-500">Add a document to start placing fields.</div> : buf ? <PdfPages data={buf} overlay={overlay} /> : 'Loading document…'}
         </div>
+      </div>
+      <div className="sticky bottom-0 z-20 -mx-4 -mb-4 flex flex-wrap items-center justify-end gap-3 border-t border-gray-200 bg-white px-4 py-2.5 shadow-[0_-2px_8px_rgba(15,23,42,0.06)] sm:-mx-6 sm:-mb-6 sm:px-6">
+        <p className="min-w-0 flex-1 text-xs text-slate-500">Generate emails the first recipient(s) a signing link and, separately, an access code. Later recipients are notified only when it is their turn.</p>
+        <div className="flex shrink-0 gap-2"><button className="btn-secondary" onClick={() => save()}>Save draft</button><button className="btn-accent" disabled={busy} onClick={() => setConfirmSend(true)}>Generate & send</button></div>
       </div>
       {confirmSend && <Modal title="Send this envelope?" onClose={() => setConfirmSend(false)} footer={<><button className="btn-secondary" onClick={() => setConfirmSend(false)}>Cancel</button><button className="btn-accent" onClick={send}>Send now</button></>}>
         <p>{rs.length} recipient(s), {fs.length} field(s), {env.documents.length} document(s).</p>
